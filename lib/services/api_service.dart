@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import '../models/ride_request.dart';
 
 class ApiService {
-  static const String _baseUrl = 'http://localhost:3001/api';
+  static const String _baseUrl = 'https://nha-carro.onrender.com/api';
 
   Future<Map<String, dynamic>> registerUser({
     required String name,
