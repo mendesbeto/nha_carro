@@ -690,14 +690,14 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
         const SizedBox(height: 18),
         const Row(
           children: [
-            const Expanded(
-                child: const _StatCard(
+            Expanded(
+                child: _StatCard(
                     label: 'Viagens',
                     value: '18',
                     icon: Icons.local_taxi_rounded)),
             SizedBox(width: 12),
-            const Expanded(
-                child: const _StatCard(
+            Expanded(
+                child: _StatCard(
                     label: 'Gasto',
                     value: '12k CFA',
                     icon: Icons.account_balance_wallet_rounded)),
