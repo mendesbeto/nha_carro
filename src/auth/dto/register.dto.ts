@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 
 export type UserRole = 'passenger' | 'driver' | 'admin';
+export type RegistrationRole = 'passenger' | 'driver';
 
 export class RegisterDto {
   @IsString()
@@ -24,8 +25,8 @@ export class RegisterDto {
   @MaxLength(128)
   password!: string;
 
-  @IsIn(['passenger', 'driver', 'admin'])
-  role!: UserRole;
+  @IsIn(['passenger', 'driver'])
+  role!: RegistrationRole;
 
   @IsOptional()
   @IsString()
