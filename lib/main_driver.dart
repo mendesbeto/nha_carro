@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/login_screen.dart';
+import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/ride_lifecycle_service.dart';
 
@@ -139,7 +140,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _logout() async {
-    await _authService.clearSession();
+    await ApiService().logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
