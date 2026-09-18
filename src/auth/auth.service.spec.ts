@@ -43,7 +43,7 @@ describe('AuthService', () => {
     const credentials = chain({ data: null, error: null });
     const user = chain({
       data: {
-        id: 'user-1', nome: ' Beto ', telefone: 'beto@example.com',
+        id: 'user-1', nome: 'Beto', telefone: 'beto@example.com',
         tipo_perfil: 'PASSAGEIRO', session_version: 0,
       },
       error: null,
