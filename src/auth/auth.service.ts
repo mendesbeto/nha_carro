@@ -153,11 +153,12 @@ export class AuthService {
 
   async refresh(rawRefreshToken: string): Promise<AuthResponse> {
     const rotated = await this.refreshTokenService.rotate(rawRefreshToken);
-    const user = await this.getUserById(rotated.userId);
+    const session = await this.getUserById(rotated.userId);
+    const user = session.user;
 
     return {
       ...user,
-      access_token: await this.createAccessToken(user, userResult.data.session_version),
+      access_token: await this.createAccessToken(user, session.sessionVersion),
       refresh_token: rotated.refreshToken,
     };
   }
@@ -191,7 +192,9 @@ export class AuthService {
     return this.toPublicUser(result.data, credentialsResult.data.email);
   }
 
-  private async getUserById(userId: string): Promise<PublicUser> {
+  private async getUserById(
+    userId: string,
+  ): Promise<{ user: PublicUser; sessionVersion: number }> {
     const result = await this.supabase.getClient()
       .from('usuarios')
       .select('id, nome, telefone, tipo_perfil, status_conta')
@@ -212,7 +215,10 @@ export class AuthService {
       throw new UnauthorizedException('Sessão inválida.');
     }
 
-    return this.toPublicUser(result.data, credentials.data.email);
+    return {
+      user: this.toPublicUser(result.data, credentials.data.email),
+      sessionVersion: result.data.session_version,
+    };
   }
 
   private createAccessToken(user: PublicUser, sessionVersion: number): Promise<string> {
