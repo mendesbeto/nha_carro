@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../main_driver.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
-import 'admin_screen.dart';
 import 'home_passenger_screen.dart';
 import 'login_screen.dart';
 
@@ -75,13 +74,6 @@ class _RegistrationRoleSelectionScreenState
                           onTap: () => setState(() => _selectedRole = UserRole.driver),
                         ),
                         const SizedBox(height: 14),
-                        _RoleCard(
-                          title: 'Admin',
-                          subtitle: 'Acompanhar operações, métricas e suporte da plataforma.',
-                          icon: Icons.admin_panel_settings_rounded,
-                          isSelected: _selectedRole == UserRole.admin,
-                          onTap: () => setState(() => _selectedRole = UserRole.admin),
-                        ),
                         const Spacer(),
                         SizedBox(
                           width: double.infinity,
@@ -90,22 +82,6 @@ class _RegistrationRoleSelectionScreenState
                             onPressed: _selectedRole == null
                                 ? null
                                 : () async {
-                                    if (_selectedRole == UserRole.admin) {
-                                      final auth = AuthService();
-                                      await auth.saveSession(
-                                        role: 'admin',
-                                        name: 'Administrador',
-                                        email: 'admin@nhacarro.com',
-                                        rememberMe: true,
-                                      );
-                                      if (!context.mounted) return;
-                                      Navigator.of(context).pushReplacement(
-                                        MaterialPageRoute<void>(
-                                          builder: (_) => const AdminScreen(),
-                                        ),
-                                      );
-                                      return;
-                                    }
                                     Navigator.of(context).push(
                                       MaterialPageRoute<void>(
                                         builder: (_) => RegistrationFormScreen(role: _selectedRole!),
@@ -310,6 +286,8 @@ class _RegistrationFormScreenState extends State<RegistrationFormScreen> {
         role: (response['role'] as String?) ?? widget.role.name,
         name: (response['name'] as String?) ?? _nameController.text.trim(),
         email: (response['email'] as String?) ?? _emailController.text.trim(),
+        accessToken: (response['access_token'] as String?) ?? '',
+        refreshToken: (response['refresh_token'] as String?) ?? '',
         phone: _phoneController.text.trim(),
         rememberMe: true,
       );

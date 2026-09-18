@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../services/auth_service.dart';
+import '../services/api_service.dart';
 import 'login_screen.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -11,11 +11,10 @@ class AdminScreen extends StatefulWidget {
 }
 
 class _AdminScreenState extends State<AdminScreen> {
-  final _authService = AuthService();
   int _selectedTab = 0;
 
   Future<void> _logout() async {
-    await _authService.clearSession();
+    await ApiService().logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginScreen()),

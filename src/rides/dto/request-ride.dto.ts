@@ -4,7 +4,6 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -22,10 +21,6 @@ export class RequestRideDto {
   @IsIn(['cash', 'orangeMoney', 'mtnMoney'])
   @IsOptional()
   paymentMethod?: string = 'cash';
-
-  @IsOptional()
-  @IsUUID()
-  passengerId?: string;
 
   @IsOptional()
   @Type(() => Number)

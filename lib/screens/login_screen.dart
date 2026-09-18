@@ -36,23 +36,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-    final isDemoAdmin = email == 'admin@nhacarro.com' && password == '123456';
-
     setState(() => _loading = true);
 
     try {
-      final response = isDemoAdmin
-          ? <String, dynamic>{
-              'role': 'admin',
-              'name': 'Administrador',
-              'email': email,
-            }
-          : await ApiService().login(email: email, password: password);
+      final response = await ApiService().login(email: email, password: password);
 
       if (!mounted) return;
 
-      final role = (response['role'] as String?) ?? _role.name;
-      final nextRole = role == 'admin' ? UserRole.admin : _role;
+      final role = (response['role'] as String?) ?? 'passenger';
+      final nextRole = switch (role) {
+        'driver' => UserRole.driver,
+        'admin' => UserRole.admin,
+        _ => UserRole.passenger,
+      };
 
       await _auth.saveSession(
         role: nextRole == UserRole.admin ? 'admin' : (role == 'driver' ? 'driver' : 'passenger'),
@@ -63,6 +59,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ? 'Passageiro'
                     : 'Motorista'),
         email: (response['email'] as String?) ?? email,
+        accessToken: (response['access_token'] as String?) ?? '',
+        refreshToken: (response['refresh_token'] as String?) ?? '',
         rememberMe: _rememberMe,
       );
 
@@ -90,42 +88,80 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _resetPassword() async {
-    final email = _emailController.text.trim();
+    final controller = TextEditingController(text: _emailController.text.trim());
 
-    if (email.isEmpty || !email.contains('@')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Informe um e-mail válido para recuperar a senha.')),
-      );
-      return;
-    }
-
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Recuperar senha'),
-        content: Text('Enviámos um link de recuperação para $email.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Ok'),
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Recuperar palavra-passe'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.emailAddress,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'E-mail',
+              hintText: 'nome@exemplo.com',
+            ),
           ),
-        ],
-      ),
-    );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final email = controller.text.trim();
+                if (!email.contains('@')) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Informe um e-mail válido.')),
+                  );
+                  return;
+                }
+
+                Navigator.of(dialogContext).pop();
+                try {
+                  await ApiService().requestPasswordReset(email: email);
+                  if (!mounted) return;
+                  await showDialog<void>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text('Verifique o seu e-mail'),
+                      content: const Text(
+                        'Se o e-mail estiver associado a uma conta, '
+                        'enviámos instruções para redefinir a palavra-passe. '
+                        'O link é válido durante 30 minutos.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Fechar'),
+                        ),
+                      ],
+                    ),
+                  );
+                } catch (error) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        error.toString().replaceFirst('Exception: ', ''),
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Enviar'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 
-  void _fillDemoCredentials(UserRole role) {
-    setState(() {
-      _role = role;
-      _emailController.text = switch (role) {
-        UserRole.passenger => 'passageiro@nhacarro.com',
-        UserRole.driver => 'motorista@nhacarro.com',
-        UserRole.admin => 'admin@nhacarro.com',
-      };
-      _passwordController.text = '123456';
-      _rememberMe = true;
-    });
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -177,11 +213,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 label: Text('Motorista'),
                                 icon: Icon(Icons.drive_eta),
                               ),
-                              ButtonSegment<UserRole>(
-                                value: UserRole.admin,
-                                label: Text('Admin'),
-                                icon: Icon(Icons.admin_panel_settings_outlined),
-                              ),
                             ],
                             selected: {_role},
                             onSelectionChanged: (newSelection) {
@@ -189,34 +220,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             },
                           ),
                           const SizedBox(height: 14),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _fillDemoCredentials(UserRole.passenger),
-                                  icon: const Icon(Icons.person_outline),
-                                  label: const Text('Demo passageiro'),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _fillDemoCredentials(UserRole.driver),
-                                  icon: const Icon(Icons.drive_eta_outlined),
-                                  label: const Text('Demo motorista'),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _fillDemoCredentials(UserRole.admin),
-                              icon: const Icon(Icons.admin_panel_settings_outlined),
-                              label: const Text('Demo admin'),
-                            ),
-                          ),
                           const SizedBox(height: 22),
                           TextFormField(
                             controller: _emailController,

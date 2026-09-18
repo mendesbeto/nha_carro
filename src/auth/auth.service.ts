@@ -7,8 +7,9 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { SupabaseService } from '../supabase/supabase.service';
+import { RefreshTokenService } from './refresh-token.service';
 import { LoginDto } from './dto/login.dto';
-import { RegisterDto, UserRole } from './dto/register.dto';
+import { RegisterDto, RegistrationRole } from './dto/register.dto';
 
 export type PublicUser = {
   id: string;
@@ -19,15 +20,15 @@ export type PublicUser = {
 
 export type AuthResponse = PublicUser & {
   access_token: string;
+  refresh_token: string;
 };
 
 const ROLE_TO_DATABASE: Record<
-  UserRole,
-  'PASSAGEIRO' | 'MOTORISTA' | 'ADMIN'
+  RegistrationRole,
+  'PASSAGEIRO' | 'MOTORISTA'
 > = {
   passenger: 'PASSAGEIRO',
   driver: 'MOTORISTA',
-  admin: 'ADMIN',
 };
 
 const DATABASE_TO_ROLE: Record<
@@ -44,6 +45,7 @@ export class AuthService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly jwtService: JwtService,
+    private readonly refreshTokenService: RefreshTokenService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResponse> {
@@ -70,7 +72,7 @@ export class AuthService {
         telefone: email,
         tipo_perfil: ROLE_TO_DATABASE[dto.role],
       })
-      .select('id, nome, telefone, tipo_perfil')
+      .select('id, nome, telefone, tipo_perfil, session_version')
       .single();
 
     if (userResult.error || !userResult.data) {
@@ -98,11 +100,15 @@ export class AuthService {
     }
 
     await this.saveVehicleIfProvided(client, dto, userResult.data.id);
-    const user = this.toPublicUser(userResult.data);
+    const user = this.toPublicUser(userResult.data, email);
 
     return {
       ...user,
-      access_token: await this.createAccessToken(user),
+      access_token: await this.createAccessToken(
+        user,
+        userResult.data.session_version,
+      ),
+      refresh_token: await this.refreshTokenService.issue(user.id),
     };
   }
 
@@ -129,7 +135,9 @@ export class AuthService {
 
     const userResult = await client
       .from('usuarios')
-      .select('id, nome, telefone, tipo_perfil, status_conta')
+      .select(
+        'id, nome, telefone, tipo_perfil, status_conta, session_version',
+      )
       .eq('id', credentialsResult.data.usuario_id)
       .maybeSingle();
     if (userResult.error || !userResult.data) {
@@ -139,34 +147,110 @@ export class AuthService {
       throw new UnauthorizedException('Esta conta está bloqueada.');
     }
 
-    const user = this.toPublicUser(userResult.data);
+    const user = this.toPublicUser(
+      userResult.data,
+      credentialsResult.data.email,
+    );
 
     return {
       ...user,
-      access_token: await this.createAccessToken(user),
+      access_token: await this.createAccessToken(
+        user,
+        userResult.data.session_version,
+      ),
+      refresh_token: await this.refreshTokenService.issue(user.id),
     };
+  }
+
+  async refresh(rawRefreshToken: string): Promise<AuthResponse> {
+    const rotated = await this.refreshTokenService.rotate(rawRefreshToken);
+    const session = await this.getUserById(rotated.userId);
+    const user = session.user;
+
+    return {
+      ...user,
+      access_token: await this.createAccessToken(user, session.sessionVersion),
+      refresh_token: rotated.refreshToken,
+    };
+  }
+
+  async logout(rawRefreshToken: string): Promise<void> {
+    await this.refreshTokenService.revoke(rawRefreshToken);
   }
 
   async getUserFromToken(payload: { sub: string; role: PublicUser['role'] }) {
     const client = this.supabase.getClient();
     const result = await client
       .from('usuarios')
-      .select('id, nome, telefone, tipo_perfil, status_conta')
+      .select('id, nome, telefone, tipo_perfil, status_conta, session_version')
       .eq('id', payload.sub)
       .maybeSingle();
 
-    if (result.error || !result.data || result.data.status_conta === 'BLOQUEADO') {
+    if (
+      result.error ||
+      !result.data ||
+      result.data.status_conta === 'BLOQUEADO'
+    ) {
       throw new UnauthorizedException('Sessão inválida.');
     }
 
-    return this.toPublicUser(result.data);
+    const credentialsResult = await client
+      .from('auth_credentials')
+      .select('email')
+      .eq('usuario_id', payload.sub)
+      .maybeSingle();
+
+    if (credentialsResult.error || !credentialsResult.data?.email) {
+      throw new UnauthorizedException('Sessão inválida.');
+    }
+
+    return this.toPublicUser(result.data, credentialsResult.data.email);
   }
 
-  private createAccessToken(user: PublicUser): Promise<string> {
+  private async getUserById(
+    userId: string,
+  ): Promise<{ user: PublicUser; sessionVersion: number }> {
+    const result = await this.supabase
+      .getClient()
+      .from('usuarios')
+      .select('id, nome, telefone, tipo_perfil, status_conta, session_version')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (
+      result.error ||
+      !result.data ||
+      result.data.status_conta === 'BLOQUEADO'
+    ) {
+      throw new UnauthorizedException('Sessão inválida.');
+    }
+
+    const credentials = await this.supabase
+      .getClient()
+      .from('auth_credentials')
+      .select('email')
+      .eq('usuario_id', userId)
+      .maybeSingle();
+
+    if (credentials.error || !credentials.data?.email) {
+      throw new UnauthorizedException('Sessão inválida.');
+    }
+
+    return {
+      user: this.toPublicUser(result.data, credentials.data.email),
+      sessionVersion: result.data.session_version,
+    };
+  }
+
+  private createAccessToken(
+    user: PublicUser,
+    sessionVersion: number,
+  ): Promise<string> {
     return this.jwtService.signAsync({
       sub: user.id,
       email: user.email,
       role: user.role,
+      sv: sessionVersion,
     });
   }
 
@@ -188,16 +272,19 @@ export class AuthService {
     });
   }
 
-  private toPublicUser(user: {
-    id: string;
-    nome: string;
-    telefone: string;
-    tipo_perfil: 'PASSAGEIRO' | 'MOTORISTA' | 'ADMIN';
-  }): PublicUser {
+  private toPublicUser(
+    user: {
+      id: string;
+      nome: string;
+      telefone: string;
+      tipo_perfil: 'PASSAGEIRO' | 'MOTORISTA' | 'ADMIN';
+    },
+    email: string,
+  ): PublicUser {
     return {
       id: user.id,
       name: user.nome,
-      email: user.telefone,
+      email,
       role: DATABASE_TO_ROLE[user.tipo_perfil],
     };
   }

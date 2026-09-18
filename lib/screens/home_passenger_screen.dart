@@ -379,6 +379,7 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
       email: emailController.text.trim().isNotEmpty
           ? emailController.text.trim()
           : _profileEmail,
+      accessToken: await _authService.getAccessToken() ?? '',
       phone: phoneController.text.trim().isNotEmpty
           ? phoneController.text.trim()
           : _profilePhone,
@@ -390,7 +391,7 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
   }
 
   Future<void> _logout() async {
-    await _authService.clearSession();
+    await ApiService().logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
@@ -1229,7 +1230,7 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<PaymentMethod>(
-          initialValue: _payment,
+          value: _payment,
           decoration: const InputDecoration(prefixIcon: Icon(Icons.payments)),
           items: const [
             DropdownMenuItem(

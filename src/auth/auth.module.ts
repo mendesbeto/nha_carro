@@ -4,6 +4,10 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { RefreshTokenService } from './refresh-token.service';
+import { PasswordResetService } from './password-reset.service';
+import { EmailService } from './email.service';
+import { PasswordResetPageController } from './password-reset-page.controller';
 
 @Module({
   imports: [
@@ -14,21 +18,24 @@ import { JwtAuthGuard } from './jwt-auth.guard';
       global: true,
       useFactory: (config: ConfigService) => {
         const secret = config.get<string>('JWT_SECRET');
-        if (!secret) {
-          throw new Error('JWT_SECRET não configurado.');
-        }
-
+        if (!secret) throw new Error('JWT_SECRET não configurado.');
         return {
           secret,
           signOptions: {
-            expiresIn: config.get<string>('JWT_ACCESS_EXPIRES_IN') ?? '1h',
+            expiresIn: (config.get<string>('JWT_ACCESS_EXPIRES_IN') ?? '1h') as any,
           },
         };
       },
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard],
+  controllers: [AuthController, PasswordResetPageController],
+  providers: [
+    AuthService,
+    JwtAuthGuard,
+    RefreshTokenService,
+    PasswordResetService,
+    EmailService,
+  ],
   exports: [AuthService, JwtAuthGuard],
 })
 export class AuthModule {}
