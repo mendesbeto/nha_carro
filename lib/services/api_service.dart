@@ -40,8 +40,7 @@ class ApiService {
         'role': role,
         'vehicle': vehicle,
         'plate': plate,
-        }),
-      ),
+      }),
     );
 
     final data = _decodeBody(response);
@@ -66,7 +65,11 @@ class ApiService {
     final data = _decodeBody(response);
     if (response.statusCode >= 400) {
       await auth.clearSession();
-      throw Exception(data['message'] ?? data['error'] ?? 'Sessão expirada. Faça login novamente.');
+      throw Exception(
+        data['message'] ??
+            data['error'] ??
+            'Sessão expirada. Faça login novamente.',
+      );
     }
 
     final accessToken = data['access_token'] as String?;
@@ -158,10 +161,11 @@ class ApiService {
         Uri.parse('$_baseUrl/rides/request'),
         headers: await _headers(authenticated: true),
         body: jsonEncode({
-        'destination': destination,
-        'category': category.name,
-        'paymentMethod': paymentMethod.name,
-      }),
+          'destination': destination,
+          'category': category.name,
+          'paymentMethod': paymentMethod.name,
+        }),
+      ),
     );
 
     final data = _decodeBody(response);
@@ -173,7 +177,8 @@ class ApiService {
       origin: data['origin'] as String? ?? 'A minha localização',
       destination: data['destination'] as String? ?? destination,
       category: RideCategory.values.firstWhere(
-        (value) => value.name == (data['category'] as String? ?? category.name),
+        (value) =>
+            value.name == (data['category'] as String? ?? category.name),
         orElse: () => category,
       ),
       paymentMethod: PaymentMethod.values.firstWhere(
