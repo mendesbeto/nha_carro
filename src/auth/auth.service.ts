@@ -20,6 +20,7 @@ export type PublicUser = {
 
 export type AuthResponse = PublicUser & {
   access_token: string;
+  refresh_token: string;
 };
 
 const ROLE_TO_DATABASE: Record<
