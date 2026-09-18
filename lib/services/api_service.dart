@@ -40,7 +40,8 @@ class ApiService {
         'role': role,
         'vehicle': vehicle,
         'plate': plate,
-      }),
+        }),
+      ),
     );
 
     final data = _decodeBody(response);
@@ -48,6 +49,71 @@ class ApiService {
       throw Exception(data['error'] ?? 'Erro ao criar conta.');
     }
     return data;
+  }
+
+  Future<Map<String, dynamic>> refreshSession() async {
+    final auth = AuthService();
+    final refreshToken = await auth.getRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      throw Exception('Sessão expirada. Faça login novamente.');
+    }
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/auth/refresh'),
+      headers: await _headers(),
+      body: jsonEncode({'refreshToken': refreshToken}),
+    );
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      await auth.clearSession();
+      throw Exception(data['message'] ?? data['error'] ?? 'Sessão expirada. Faça login novamente.');
+    }
+
+    final accessToken = data['access_token'] as String?;
+    final newRefreshToken = data['refresh_token'] as String?;
+    if (accessToken == null || newRefreshToken == null) {
+      await auth.clearSession();
+      throw Exception('Resposta de sessão inválida.');
+    }
+
+    await auth.updateTokens(
+      accessToken: accessToken,
+      refreshToken: newRefreshToken,
+    );
+    return data;
+  }
+
+  Future<void> logout() async {
+    final auth = AuthService();
+    final refreshToken = await auth.getRefreshToken();
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      try {
+        await http.post(
+          Uri.parse('$_baseUrl/auth/logout'),
+          headers: await _headers(),
+          body: jsonEncode({'refreshToken': refreshToken}),
+        );
+      } finally {
+        await auth.clearSession();
+      }
+    } else {
+      await auth.clearSession();
+    }
+  }
+
+  Future<http.Response> _authenticatedRequest(
+    Future<http.Response> Function() request, {
+    bool retry = true,
+  }) async {
+    final response = await request();
+    if (response.statusCode != 401 || !retry) return response;
+
+    try {
+      await refreshSession();
+      return await request();
+    } catch (_) {
+      return response;
+    }
   }
 
   Future<Map<String, dynamic>> login({
@@ -68,9 +134,11 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> me() async {
-    final response = await http.get(
-      Uri.parse('$_baseUrl/auth/me'),
-      headers: await _headers(authenticated: true),
+    final response = await _authenticatedRequest(
+      () => http.get(
+        Uri.parse('$_baseUrl/auth/me'),
+        headers: _headers(authenticated: true),
+      ),
     );
 
     final data = _decodeBody(response);
@@ -85,10 +153,11 @@ class ApiService {
     required RideCategory category,
     required PaymentMethod paymentMethod,
   }) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/rides/request'),
-      headers: await _headers(authenticated: true),
-      body: jsonEncode({
+    final response = await _authenticatedRequest(
+      () => http.post(
+        Uri.parse('$_baseUrl/rides/request'),
+        headers: _headers(authenticated: true),
+        body: jsonEncode({
         'destination': destination,
         'category': category.name,
         'paymentMethod': paymentMethod.name,
