@@ -39,13 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
 
     try {
-      final response = isDemoAdmin
-          ? <String, dynamic>{
-              'role': 'admin',
-              'name': 'Administrador',
-              'email': email,
-            }
-          : await ApiService().login(email: email, password: password);
+      final response = await ApiService().login(email: email, password: password);
 
       if (!mounted) return;
 
@@ -113,18 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _fillDemoCredentials(UserRole role) {
-    setState(() {
-      _role = role;
-      _emailController.text = switch (role) {
-        UserRole.passenger => 'passageiro@nhacarro.com',
-        UserRole.driver => 'motorista@nhacarro.com',
-        UserRole.admin => 'admin@nhacarro.com',
-      };
-      _passwordController.text = '123456';
-      _rememberMe = true;
-    });
-  }
+
 
   @override
   Widget build(BuildContext context) {
