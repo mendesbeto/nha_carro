@@ -40,9 +40,8 @@ export class EmailService {
     });
 
     if (!response.ok) {
-      const body = await response.text();
       this.logger.error(
-        `Password reset email delivery failed with status ${response.status}: ${body.slice(0, 300)}`,
+        `Password reset email delivery failed with status ${response.status}.`,
       );
     }
   }
