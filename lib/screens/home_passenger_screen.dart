@@ -391,7 +391,7 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
   }
 
   Future<void> _logout() async {
-    await _authService.clearSession();
+    await ApiService().logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
