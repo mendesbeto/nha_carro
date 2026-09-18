@@ -1,10 +1,12 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { RequestRideDto } from './dto/request-ride.dto';
+import { CurrentUserPayload } from '../auth/current-user.decorator';
 
 const FARES: Record<string, number> = {
   taxi: 2500,
@@ -12,18 +14,21 @@ const FARES: Record<string, number> = {
   moto: 1800,
 };
 
-const PAYMENT_METHODS: Record<string, 'DINHEIRO' | 'ORANGE_MONEY' | 'MTN_MONEY'> =
-  {
-    cash: 'DINHEIRO',
-    orangeMoney: 'ORANGE_MONEY',
-    mtnMoney: 'MTN_MONEY',
-  };
+const PAYMENT_METHODS: Record<string, 'DINHEIRO' | 'ORANGE_MONEY' | 'MTN_MONEY'> = {
+  cash: 'DINHEIRO',
+  orangeMoney: 'ORANGE_MONEY',
+  mtnMoney: 'MTN_MONEY',
+};
 
 @Injectable()
 export class RidesService {
   constructor(private readonly supabase: SupabaseService) {}
 
-  async request(dto: RequestRideDto) {
+  async request(dto: RequestRideDto, user: CurrentUserPayload) {
+    if (user.role !== 'passenger') {
+      throw new ForbiddenException('Apenas passageiros podem solicitar viagens.');
+    }
+
     const destination = dto.destination.trim();
     if (!destination) {
       throw new BadRequestException('Informe o destino da viagem.');
@@ -56,7 +61,7 @@ export class RidesService {
       dto.destinationLng,
     ].every((value) => value !== undefined);
 
-    if (!coordinatesProvided || !dto.passengerId) {
+    if (!coordinatesProvided) {
       return response;
     }
 
@@ -64,8 +69,9 @@ export class RidesService {
     const passenger = await client
       .from('usuarios')
       .select('id')
-      .eq('id', dto.passengerId)
+      .eq('id', user.sub)
       .maybeSingle();
+
     if (passenger.error || !passenger.data) {
       throw new BadRequestException('Passageiro inválido.');
     }
@@ -73,7 +79,7 @@ export class RidesService {
     const result = await client
       .from('corridas')
       .insert({
-        passageiro_id: dto.passengerId,
+        passageiro_id: user.sub,
         origem_coords: {
           type: 'Point',
           coordinates: [dto.originLng, dto.originLat],
