@@ -4,7 +4,7 @@ import { RefreshTokenService } from './refresh-token.service';
 function makeClient(rpcResult: unknown) {
   const rpc = jest.fn().mockResolvedValue(rpcResult);
   const insert = jest.fn().mockResolvedValue({ error: null });
-  const updateChain = { update: jest.fn(() => updateChain), eq: jest.fn(() => updateChain), is: jest.fn().mockResolvedValue({ error: null }) };
+  const updateChain: { update: jest.Mock; eq: jest.Mock; is: jest.Mock } = {\n    update: jest.fn(),\n    eq: jest.fn(),\n    is: jest.fn(),\n  };\n  updateChain.update.mockReturnValue(updateChain);\n  updateChain.eq.mockReturnValue(updateChain);\n  updateChain.is.mockResolvedValue({ error: null });
   return { client: { rpc, from: jest.fn(() => ({ insert, ...updateChain })) }, rpc, insert };
 }
 
