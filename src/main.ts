@@ -8,6 +8,21 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
   const config = app.get(ConfigService);
+  const requiredEnv = [
+    'SUPABASE_URL',
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'JWT_SECRET',
+    'CORS_ORIGINS',
+    'RESEND_API_KEY',
+    'EMAIL_FROM',
+    'PASSWORD_RESET_URL',
+  ];
+  const missingEnv = requiredEnv.filter((key) => !config.get<string>(key)?.trim());
+
+  if (missingEnv.length > 0) {
+    throw new Error(`Missing required environment variables: ${missingEnv.join(', ')}`);
+  }
+
   const configuredOrigins = config
     .get<string>('CORS_ORIGINS', '')
     .split(',')
