@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   static const String _accessTokenKey = 'nhacarro_access_token';
+  static const String _refreshTokenKey = 'nhacarro_refresh_token';
   static const String _roleKey = 'nhacarro_user_role';
   static const String _nameKey = 'nhacarro_user_name';
   static const String _emailKey = 'nhacarro_user_email';
@@ -22,6 +23,7 @@ class AuthService {
     String? phone,
     String? address,
     required String accessToken,
+    String? refreshToken,
     bool rememberMe = true,
   }) async {
     final prefs = await SharedPreferences.getInstance();
@@ -34,6 +36,9 @@ class AuthService {
     // Keep the token for the current app session. rememberMe controls
     // whether the local session is restored automatically after restart.
     await _secureStorage.write(key: _accessTokenKey, value: accessToken);
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      await _secureStorage.write(key: _refreshTokenKey, value: refreshToken);
+    }
     await prefs.setBool(_rememberMeKey, rememberMe);
     await prefs.setString(_roleKey, role);
     await prefs.setString(_nameKey, name);
@@ -44,6 +49,16 @@ class AuthService {
   }
 
   Future<String?> getAccessToken() => _secureStorage.read(key: _accessTokenKey);
+
+  Future<String?> getRefreshToken() => _secureStorage.read(key: _refreshTokenKey);
+
+  Future<void> updateTokens({
+    required String accessToken,
+    required String refreshToken,
+  }) async {
+    await _secureStorage.write(key: _accessTokenKey, value: accessToken);
+    await _secureStorage.write(key: _refreshTokenKey, value: refreshToken);
+  }
 
   Future<void> savePreferredPayment(String paymentMethod) async {
     final prefs = await SharedPreferences.getInstance();
@@ -110,6 +125,7 @@ class AuthService {
   Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
     await _secureStorage.delete(key: _accessTokenKey);
+    await _secureStorage.delete(key: _refreshTokenKey);
     for (final key in [
       _roleKey,
       _nameKey,
