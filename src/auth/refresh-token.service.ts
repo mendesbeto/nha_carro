@@ -51,7 +51,17 @@ export class RefreshTokenService {
       throw new UnauthorizedException('Refresh token inválido, expirado ou revogado.');
     }
 
-    const row = result.data[0] as { user_id: string; new_token_id: string };
+    const row = result.data[0] as {
+      user_id: string | null;
+      new_token_id: string | null;
+      replay_detected: boolean;
+    };
+
+    if (row.replay_detected || !row.user_id || !row.new_token_id) {
+      throw new UnauthorizedException(
+        'Sessão invalidada por reutilização de refresh token.',
+      );
+    }
 
     return {
       userId: row.user_id,
