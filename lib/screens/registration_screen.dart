@@ -287,6 +287,7 @@ class _RegistrationFormScreenState extends State<RegistrationFormScreen> {
         role: (response['role'] as String?) ?? widget.role.name,
         name: (response['name'] as String?) ?? _nameController.text.trim(),
         email: (response['email'] as String?) ?? _emailController.text.trim(),
+        accessToken: (response['access_token'] as String?) ?? '',
         phone: _phoneController.text.trim(),
         rememberMe: true,
       );
