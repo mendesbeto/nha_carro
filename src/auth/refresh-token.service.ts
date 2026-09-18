@@ -69,6 +69,14 @@ export class RefreshTokenService {
     };
   }
 
+  async revokeAll(userId: string): Promise<void> {
+    await this.supabase.getClient()
+      .from('auth_refresh_tokens')
+      .update({ revoked_at: new Date().toISOString() })
+      .eq('usuario_id', userId)
+      .is('revoked_at', null);
+  }
+
   async revoke(rawToken: string): Promise<void> {
     const tokenHash = this.hash(rawToken);
     await this.supabase.getClient()
