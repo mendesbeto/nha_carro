@@ -7,6 +7,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { SupabaseService } from '../supabase/supabase.service';
+import { RefreshTokenService } from './refresh-token.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto, RegistrationRole, UserRole } from './dto/register.dto';
 
@@ -43,6 +44,7 @@ export class AuthService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly jwtService: JwtService,
+    private readonly refreshTokenService: RefreshTokenService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResponse> {
@@ -102,6 +104,7 @@ export class AuthService {
     return {
       ...user,
       access_token: await this.createAccessToken(user),
+      refresh_token: await this.refreshTokenService.issue(user.id),
     };
   }
 
@@ -146,6 +149,21 @@ export class AuthService {
     };
   }
 
+  async refresh(rawRefreshToken: string): Promise<AuthResponse> {
+    const rotated = await this.refreshTokenService.rotate(rawRefreshToken);
+    const user = await this.getUserById(rotated.userId);
+
+    return {
+      ...user,
+      access_token: await this.createAccessToken(user),
+      refresh_token: rotated.refreshToken,
+    };
+  }
+
+  async logout(rawRefreshToken: string): Promise<void> {
+    await this.refreshTokenService.revoke(rawRefreshToken);
+  }
+
   async getUserFromToken(payload: { sub: string; role: PublicUser['role'] }) {
     const client = this.supabase.getClient();
     const result = await client
@@ -169,6 +187,30 @@ export class AuthService {
     }
 
     return this.toPublicUser(result.data, credentialsResult.data.email);
+  }
+
+  private async getUserById(userId: string): Promise<PublicUser> {
+    const result = await this.supabase.getClient()
+      .from('usuarios')
+      .select('id, nome, telefone, tipo_perfil, status_conta')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (result.error || !result.data || result.data.status_conta === 'BLOQUEADO') {
+      throw new UnauthorizedException('Sessão inválida.');
+    }
+
+    const credentials = await this.supabase.getClient()
+      .from('auth_credentials')
+      .select('email')
+      .eq('usuario_id', userId)
+      .maybeSingle();
+
+    if (credentials.error || !credentials.data?.email) {
+      throw new UnauthorizedException('Sessão inválida.');
+    }
+
+    return this.toPublicUser(result.data, credentials.data.email);
   }
 
   private createAccessToken(user: PublicUser): Promise<string> {
