@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RefreshTokenService } from './refresh-token.service';
 import { PasswordResetService } from './password-reset.service';
+import { EmailService } from './email.service';
 
 @Module({
   imports: [
@@ -27,7 +28,13 @@ import { PasswordResetService } from './password-reset.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, RefreshTokenService, PasswordResetService],
+  providers: [
+    AuthService,
+    JwtAuthGuard,
+    RefreshTokenService,
+    PasswordResetService,
+    EmailService,
+  ],
   exports: [AuthService, JwtAuthGuard],
 })
 export class AuthModule {}
