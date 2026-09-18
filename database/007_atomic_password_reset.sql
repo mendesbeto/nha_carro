@@ -28,6 +28,14 @@ BEGIN
     RETURN;
   END IF;
 
+  UPDATE public.usuarios
+  SET session_version = session_version + 1
+  WHERE id = token_record.usuario_id;
+
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+
   UPDATE public.auth_password_reset_tokens
   SET used_at = CURRENT_TIMESTAMP
   WHERE id = token_record.id;
