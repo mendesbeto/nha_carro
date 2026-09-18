@@ -147,6 +147,7 @@ export class AuthService {
     return {
       ...user,
       access_token: await this.createAccessToken(user),
+      refresh_token: await this.refreshTokenService.issue(user.id),
     };
   }
 
