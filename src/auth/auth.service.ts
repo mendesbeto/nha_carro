@@ -8,7 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { SupabaseService } from '../supabase/supabase.service';
 import { LoginDto } from './dto/login.dto';
-import { RegisterDto, UserRole } from './dto/register.dto';
+import { RegisterDto, RegistrationRole, UserRole } from './dto/register.dto';
 
 export type PublicUser = {
   id: string;
@@ -22,12 +22,11 @@ export type AuthResponse = PublicUser & {
 };
 
 const ROLE_TO_DATABASE: Record<
-  UserRole,
-  'PASSAGEIRO' | 'MOTORISTA' | 'ADMIN'
+  RegistrationRole,
+  'PASSAGEIRO' | 'MOTORISTA'
 > = {
   passenger: 'PASSAGEIRO',
   driver: 'MOTORISTA',
-  admin: 'ADMIN',
 };
 
 const DATABASE_TO_ROLE: Record<
