@@ -104,7 +104,7 @@ export class AuthService {
 
     return {
       ...user,
-      access_token: await this.createAccessToken(user),
+      access_token: await this.createAccessToken(user, userResult.data.session_version),
       refresh_token: await this.refreshTokenService.issue(user.id),
     };
   }
@@ -132,7 +132,7 @@ export class AuthService {
 
     const userResult = await client
       .from('usuarios')
-      .select('id, nome, telefone, tipo_perfil, status_conta')
+      .select('id, nome, telefone, tipo_perfil, status_conta, session_version')
       .eq('id', credentialsResult.data.usuario_id)
       .maybeSingle();
     if (userResult.error || !userResult.data) {
@@ -146,7 +146,7 @@ export class AuthService {
 
     return {
       ...user,
-      access_token: await this.createAccessToken(user),
+      access_token: await this.createAccessToken(user, userResult.data.session_version),
       refresh_token: await this.refreshTokenService.issue(user.id),
     };
   }
@@ -157,7 +157,7 @@ export class AuthService {
 
     return {
       ...user,
-      access_token: await this.createAccessToken(user),
+      access_token: await this.createAccessToken(user, userResult.data.session_version),
       refresh_token: rotated.refreshToken,
     };
   }
@@ -215,11 +215,12 @@ export class AuthService {
     return this.toPublicUser(result.data, credentials.data.email);
   }
 
-  private createAccessToken(user: PublicUser): Promise<string> {
+  private createAccessToken(user: PublicUser, sessionVersion: number): Promise<string> {
     return this.jwtService.signAsync({
       sub: user.id,
       email: user.email,
       role: user.role,
+      sv: sessionVersion,
     });
   }
 
