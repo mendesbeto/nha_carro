@@ -1,11 +1,9 @@
-import {
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
 import { SupabaseService } from '../supabase/supabase.service';
 import { RefreshTokenService } from './refresh-token.service';
+import { EmailService } from './email.service';
 
 @Injectable()
 export class PasswordResetService {
@@ -14,6 +12,7 @@ export class PasswordResetService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly refreshTokenService: RefreshTokenService,
+    private readonly emailService: EmailService,
   ) {}
 
   async request(email: string): Promise<void> {
@@ -49,11 +48,10 @@ export class PasswordResetService {
       });
 
     if (inserted.error) {
-      throw new BadRequestException('Não foi possível iniciar a recuperação.');
+      return;
     }
 
-    // The raw token must only be delivered through the configured side-channel.
-    // It is intentionally never returned or logged by the API.
+    await this.emailService.sendPasswordResetEmail(normalizedEmail, rawToken);
   }
 
   async reset(
@@ -65,29 +63,22 @@ export class PasswordResetService {
       throw new BadRequestException('As senhas não coincidem.');
     }
 
-    const tokenHash = this.hash(rawToken);
+    const passwordHash = await bcrypt.hash(password, 12);
     const result = await this.supabase.getClient().rpc(
-      'consume_password_reset_token',
-      { p_token_hash: tokenHash },
+      'complete_password_reset',
+      {
+        p_token_hash: this.hash(rawToken),
+        p_password_hash: passwordHash,
+      },
     );
 
     if (result.error || !result.data?.length) {
-      throw new BadRequestException('Token de recuperação inválido ou expirado.');
+      throw new BadRequestException(
+        'Token de recuperação inválido ou expirado.',
+      );
     }
 
     const userId = (result.data[0] as { user_id: string }).user_id;
-    const passwordHash = await bcrypt.hash(password, 12);
-
-    const updated = await this.supabase
-      .getClient()
-      .from('auth_credentials')
-      .update({ password_hash: passwordHash })
-      .eq('usuario_id', userId);
-
-    if (updated.error) {
-      throw new BadRequestException('Não foi possível atualizar a senha.');
-    }
-
     await this.refreshTokenService.revokeAll(userId);
   }
 
