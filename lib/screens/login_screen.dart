@@ -43,8 +43,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      final role = (response['role'] as String?) ?? _role.name;
-      final nextRole = role == 'admin' ? UserRole.admin : _role;
+      final role = (response['role'] as String?) ?? 'passenger';
+      final nextRole = switch (role) {
+        'driver' => UserRole.driver,
+        'admin' => UserRole.admin,
+        _ => UserRole.passenger,
+      };
 
       await _auth.saveSession(
         role: nextRole == UserRole.admin ? 'admin' : (role == 'driver' ? 'driver' : 'passenger'),
