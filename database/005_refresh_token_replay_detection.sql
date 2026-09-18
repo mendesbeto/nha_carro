@@ -27,7 +27,7 @@ BEGIN
 
   IF current_token.revoked_at IS NOT NULL THEN
     UPDATE public.auth_refresh_tokens
-    SET revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP)
+    SET revoked_at = CURRENT_TIMESTAMP
     WHERE usuario_id = current_token.usuario_id
       AND revoked_at IS NULL;
 
