@@ -9,7 +9,7 @@ import * as bcrypt from 'bcrypt';
 import { SupabaseService } from '../supabase/supabase.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { LoginDto } from './dto/login.dto';
-import { RegisterDto, RegistrationRole, UserRole } from './dto/register.dto';
+import { RegisterDto, RegistrationRole } from './dto/register.dto';
 
 export type PublicUser = {
   id: string;
@@ -72,7 +72,7 @@ export class AuthService {
         telefone: email,
         tipo_perfil: ROLE_TO_DATABASE[dto.role],
       })
-      .select('id, nome, telefone, tipo_perfil')
+      .select('id, nome, telefone, tipo_perfil, session_version')
       .single();
 
     if (userResult.error || !userResult.data) {
@@ -104,7 +104,10 @@ export class AuthService {
 
     return {
       ...user,
-      access_token: await this.createAccessToken(user, userResult.data.session_version),
+      access_token: await this.createAccessToken(
+        user,
+        userResult.data.session_version,
+      ),
       refresh_token: await this.refreshTokenService.issue(user.id),
     };
   }
@@ -132,7 +135,9 @@ export class AuthService {
 
     const userResult = await client
       .from('usuarios')
-      .select('id, nome, telefone, tipo_perfil, status_conta, session_version')
+      .select(
+        'id, nome, telefone, tipo_perfil, status_conta, session_version',
+      )
       .eq('id', credentialsResult.data.usuario_id)
       .maybeSingle();
     if (userResult.error || !userResult.data) {
@@ -142,11 +147,17 @@ export class AuthService {
       throw new UnauthorizedException('Esta conta está bloqueada.');
     }
 
-    const user = this.toPublicUser(userResult.data, credentialsResult.data.email);
+    const user = this.toPublicUser(
+      userResult.data,
+      credentialsResult.data.email,
+    );
 
     return {
       ...user,
-      access_token: await this.createAccessToken(user, userResult.data.session_version),
+      access_token: await this.createAccessToken(
+        user,
+        userResult.data.session_version,
+      ),
       refresh_token: await this.refreshTokenService.issue(user.id),
     };
   }
@@ -171,11 +182,15 @@ export class AuthService {
     const client = this.supabase.getClient();
     const result = await client
       .from('usuarios')
-      .select('id, nome, telefone, tipo_perfil, status_conta')
+      .select('id, nome, telefone, tipo_perfil, status_conta, session_version')
       .eq('id', payload.sub)
       .maybeSingle();
 
-    if (result.error || !result.data || result.data.status_conta === 'BLOQUEADO') {
+    if (
+      result.error ||
+      !result.data ||
+      result.data.status_conta === 'BLOQUEADO'
+    ) {
       throw new UnauthorizedException('Sessão inválida.');
     }
 
@@ -195,17 +210,23 @@ export class AuthService {
   private async getUserById(
     userId: string,
   ): Promise<{ user: PublicUser; sessionVersion: number }> {
-    const result = await this.supabase.getClient()
+    const result = await this.supabase
+      .getClient()
       .from('usuarios')
-      .select('id, nome, telefone, tipo_perfil, status_conta')
+      .select('id, nome, telefone, tipo_perfil, status_conta, session_version')
       .eq('id', userId)
       .maybeSingle();
 
-    if (result.error || !result.data || result.data.status_conta === 'BLOQUEADO') {
+    if (
+      result.error ||
+      !result.data ||
+      result.data.status_conta === 'BLOQUEADO'
+    ) {
       throw new UnauthorizedException('Sessão inválida.');
     }
 
-    const credentials = await this.supabase.getClient()
+    const credentials = await this.supabase
+      .getClient()
       .from('auth_credentials')
       .select('email')
       .eq('usuario_id', userId)
@@ -221,7 +242,10 @@ export class AuthService {
     };
   }
 
-  private createAccessToken(user: PublicUser, sessionVersion: number): Promise<string> {
+  private createAccessToken(
+    user: PublicUser,
+    sessionVersion: number,
+  ): Promise<string> {
     return this.jwtService.signAsync({
       sub: user.id,
       email: user.email,
