@@ -75,13 +75,6 @@ class _RegistrationRoleSelectionScreenState
                           onTap: () => setState(() => _selectedRole = UserRole.driver),
                         ),
                         const SizedBox(height: 14),
-                        _RoleCard(
-                          title: 'Admin',
-                          subtitle: 'Acompanhar operações, métricas e suporte da plataforma.',
-                          icon: Icons.admin_panel_settings_rounded,
-                          isSelected: _selectedRole == UserRole.admin,
-                          onTap: () => setState(() => _selectedRole = UserRole.admin),
-                        ),
                         const Spacer(),
                         SizedBox(
                           width: double.infinity,
@@ -90,22 +83,6 @@ class _RegistrationRoleSelectionScreenState
                             onPressed: _selectedRole == null
                                 ? null
                                 : () async {
-                                    if (_selectedRole == UserRole.admin) {
-                                      final auth = AuthService();
-                                      await auth.saveSession(
-                                        role: 'admin',
-                                        name: 'Administrador',
-                                        email: 'admin@nhacarro.com',
-                                        rememberMe: true,
-                                      );
-                                      if (!context.mounted) return;
-                                      Navigator.of(context).pushReplacement(
-                                        MaterialPageRoute<void>(
-                                          builder: (_) => const AdminScreen(),
-                                        ),
-                                      );
-                                      return;
-                                    }
                                     Navigator.of(context).push(
                                       MaterialPageRoute<void>(
                                         builder: (_) => RegistrationFormScreen(role: _selectedRole!),
