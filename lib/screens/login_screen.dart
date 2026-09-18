@@ -60,6 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     : 'Motorista'),
         email: (response['email'] as String?) ?? email,
         accessToken: (response['access_token'] as String?) ?? '',
+        refreshToken: (response['refresh_token'] as String?) ?? '',
         rememberMe: _rememberMe,
       );
 
