@@ -36,8 +36,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-    final isDemoAdmin = email == 'admin@nhacarro.com' && password == '123456';
-
     setState(() => _loading = true);
 
     try {
@@ -63,6 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ? 'Passageiro'
                     : 'Motorista'),
         email: (response['email'] as String?) ?? email,
+        accessToken: (response['access_token'] as String?) ?? '',
         rememberMe: _rememberMe,
       );
 
@@ -189,34 +188,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             },
                           ),
                           const SizedBox(height: 14),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _fillDemoCredentials(UserRole.passenger),
-                                  icon: const Icon(Icons.person_outline),
-                                  label: const Text('Demo passageiro'),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _fillDemoCredentials(UserRole.driver),
-                                  icon: const Icon(Icons.drive_eta_outlined),
-                                  label: const Text('Demo motorista'),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _fillDemoCredentials(UserRole.admin),
-                              icon: const Icon(Icons.admin_panel_settings_outlined),
-                              label: const Text('Demo admin'),
-                            ),
-                          ),
                           const SizedBox(height: 22),
                           TextFormField(
                             controller: _emailController,
