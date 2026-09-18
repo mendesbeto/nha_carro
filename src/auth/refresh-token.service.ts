@@ -37,56 +37,26 @@ export class RefreshTokenService {
 
   async rotate(rawToken: string): Promise<{ userId: string; refreshToken: string }> {
     const tokenHash = this.hash(rawToken);
-    const client = this.supabase.getClient();
-
-    const result = await client
-      .from('auth_refresh_tokens')
-      .select('id, usuario_id, expires_at, revoked_at')
-      .eq('token_hash', tokenHash)
-      .maybeSingle();
-
-    if (result.error || !result.data) {
-      throw new UnauthorizedException('Refresh token inválido.');
-    }
-
-    const token = result.data as RefreshTokenRecord;
-    if (token.revoked_at || new Date(token.expires_at).getTime() <= Date.now()) {
-      throw new UnauthorizedException('Refresh token expirado ou revogado.');
-    }
-
     const newToken = randomBytes(48).toString('base64url');
     const newHash = this.hash(newToken);
     const newExpiresAt = new Date(Date.now() + this.ttlMs).toISOString();
 
-    const inserted = await client
-      .from('auth_refresh_tokens')
-      .insert({
-        usuario_id: token.usuario_id,
-        token_hash: newHash,
-        expires_at: newExpiresAt,
-      })
-      .select('id')
-      .single();
+    const result = await this.supabase.getClient().rpc('rotate_refresh_token', {
+      p_token_hash: tokenHash,
+      p_new_token_hash: newHash,
+      p_expires_at: newExpiresAt,
+    });
 
-    if (inserted.error || !inserted.data) {
-      throw new UnauthorizedException('Não foi possível renovar a sessão.');
+    if (result.error || !result.data?.length) {
+      throw new UnauthorizedException('Refresh token inválido, expirado ou revogado.');
     }
 
-    const revoked = await client
-      .from('auth_refresh_tokens')
-      .update({
-        revoked_at: new Date().toISOString(),
-        replaced_by: inserted.data.id,
-      })
-      .eq('id', token.id)
-      .is('revoked_at', null);
+    const row = result.data[0] as { user_id: string; new_token_id: string };
 
-    if (revoked.error) {
-      await client.from('auth_refresh_tokens').delete().eq('id', inserted.data.id);
-      throw new UnauthorizedException('Não foi possível renovar a sessão.');
-    }
-
-    return { userId: token.usuario_id, refreshToken: newToken };
+    return {
+      userId: row.user_id,
+      refreshToken: newToken,
+    };
   }
 
   async revoke(rawToken: string): Promise<void> {
