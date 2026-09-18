@@ -97,7 +97,7 @@ export class AuthService {
     }
 
     await this.saveVehicleIfProvided(client, dto, userResult.data.id);
-    const user = this.toPublicUser(userResult.data);
+    const user = this.toPublicUser(userResult.data, email);
 
     return {
       ...user,
@@ -138,7 +138,7 @@ export class AuthService {
       throw new UnauthorizedException('Esta conta está bloqueada.');
     }
 
-    const user = this.toPublicUser(userResult.data);
+    const user = this.toPublicUser(userResult.data, credentialsResult.data.email);
 
     return {
       ...user,
@@ -158,7 +158,17 @@ export class AuthService {
       throw new UnauthorizedException('Sessão inválida.');
     }
 
-    return this.toPublicUser(result.data);
+    const credentialsResult = await client
+      .from('auth_credentials')
+      .select('email')
+      .eq('usuario_id', payload.sub)
+      .maybeSingle();
+
+    if (credentialsResult.error || !credentialsResult.data?.email) {
+      throw new UnauthorizedException('Sessão inválida.');
+    }
+
+    return this.toPublicUser(result.data, credentialsResult.data.email);
   }
 
   private createAccessToken(user: PublicUser): Promise<string> {
@@ -187,16 +197,19 @@ export class AuthService {
     });
   }
 
-  private toPublicUser(user: {
-    id: string;
-    nome: string;
-    telefone: string;
-    tipo_perfil: 'PASSAGEIRO' | 'MOTORISTA' | 'ADMIN';
-  }): PublicUser {
+  private toPublicUser(
+    user: {
+      id: string;
+      nome: string;
+      telefone: string;
+      tipo_perfil: 'PASSAGEIRO' | 'MOTORISTA' | 'ADMIN';
+    },
+    email: string,
+  ): PublicUser {
     return {
       id: user.id,
       name: user.nome,
-      email: user.telefone,
+      email,
       role: DATABASE_TO_ROLE[user.tipo_perfil],
     };
   }
