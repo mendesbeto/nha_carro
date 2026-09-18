@@ -26,13 +26,15 @@ class AuthService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
 
-    if (!rememberMe || accessToken.isEmpty) {
+    if (accessToken.isEmpty) {
       await clearSession();
       return;
     }
 
+    // Keep the token for the current app session. rememberMe controls
+    // whether the local session is restored automatically after restart.
     await _secureStorage.write(key: _accessTokenKey, value: accessToken);
-    await prefs.setBool(_rememberMeKey, true);
+    await prefs.setBool(_rememberMeKey, rememberMe);
     await prefs.setString(_roleKey, role);
     await prefs.setString(_nameKey, name);
     await prefs.setString(_emailKey, email);
