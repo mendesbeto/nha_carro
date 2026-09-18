@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
 
@@ -15,7 +16,7 @@ class _AdminScreenState extends State<AdminScreen> {
   int _selectedTab = 0;
 
   Future<void> _logout() async {
-    await _authService.clearSession();
+    await ApiService().logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
