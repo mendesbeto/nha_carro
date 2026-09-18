@@ -4,16 +4,21 @@ import {
   InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { SupabaseService } from '../supabase/supabase.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto, UserRole } from './dto/register.dto';
 
-type PublicUser = {
+export type PublicUser = {
   id: string;
   name: string;
   email: string;
   role: 'passenger' | 'driver' | 'admin';
+};
+
+export type AuthResponse = PublicUser & {
+  access_token: string;
 };
 
 const ROLE_TO_DATABASE: Record<
@@ -36,9 +41,12 @@ const DATABASE_TO_ROLE: Record<
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly jwtService: JwtService,
+  ) {}
 
-  async register(dto: RegisterDto): Promise<PublicUser> {
+  async register(dto: RegisterDto): Promise<AuthResponse> {
     const email = dto.email.trim().toLowerCase();
     const name = dto.name.trim();
     const client = this.supabase.getClient();
@@ -90,10 +98,15 @@ export class AuthService {
     }
 
     await this.saveVehicleIfProvided(client, dto, userResult.data.id);
-    return this.toPublicUser(userResult.data);
+    const user = this.toPublicUser(userResult.data);
+
+    return {
+      ...user,
+      access_token: await this.createAccessToken(user),
+    };
   }
 
-  async login(dto: LoginDto): Promise<PublicUser> {
+  async login(dto: LoginDto): Promise<AuthResponse> {
     const email = dto.email.trim().toLowerCase();
     const client = this.supabase.getClient();
     const credentialsResult = await client
@@ -126,7 +139,35 @@ export class AuthService {
       throw new UnauthorizedException('Esta conta está bloqueada.');
     }
 
-    return this.toPublicUser(userResult.data);
+    const user = this.toPublicUser(userResult.data);
+
+    return {
+      ...user,
+      access_token: await this.createAccessToken(user),
+    };
+  }
+
+  async getUserFromToken(payload: { sub: string; role: PublicUser['role'] }) {
+    const client = this.supabase.getClient();
+    const result = await client
+      .from('usuarios')
+      .select('id, nome, telefone, tipo_perfil, status_conta')
+      .eq('id', payload.sub)
+      .maybeSingle();
+
+    if (result.error || !result.data || result.data.status_conta === 'BLOQUEADO') {
+      throw new UnauthorizedException('Sessão inválida.');
+    }
+
+    return this.toPublicUser(result.data);
+  }
+
+  private createAccessToken(user: PublicUser): Promise<string> {
+    return this.jwtService.signAsync({
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    });
   }
 
   private async saveVehicleIfProvided(
