@@ -101,11 +101,15 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Recuperar senha'),
-        content: Text('Enviámos um link de recuperação para $email.'),
+        content: Text(
+          'A recuperação automática por e-mail ainda não está configurada. '
+          'Por segurança, nenhum link foi enviado. Contacte o suporte para '
+          'iniciar a recuperação da sua conta.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Ok'),
+            child: const Text('Fechar'),
           ),
         ],
       ),
@@ -163,11 +167,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 value: UserRole.driver,
                                 label: Text('Motorista'),
                                 icon: Icon(Icons.drive_eta),
-                              ),
-                              ButtonSegment<UserRole>(
-                                value: UserRole.admin,
-                                label: Text('Admin'),
-                                icon: Icon(Icons.admin_panel_settings_outlined),
                               ),
                             ],
                             selected: {_role},
