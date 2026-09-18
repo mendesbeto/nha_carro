@@ -14,10 +14,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
       global: true,
       useFactory: (config: ConfigService) => {
         const secret = config.get<string>('JWT_SECRET');
-        if (!secret) {
-          throw new Error('JWT_SECRET não configurado.');
-        }
-
+        if (!secret) throw new Error('JWT_SECRET não configurado.');
         return {
           secret,
           signOptions: {
