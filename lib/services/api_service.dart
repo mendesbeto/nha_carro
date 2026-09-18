@@ -135,9 +135,9 @@ class ApiService {
 
   Future<Map<String, dynamic>> me() async {
     final response = await _authenticatedRequest(
-      () => http.get(
+      () async => http.get(
         Uri.parse('$_baseUrl/auth/me'),
-        headers: _headers(authenticated: true),
+        headers: await _headers(authenticated: true),
       ),
     );
 
@@ -154,9 +154,9 @@ class ApiService {
     required PaymentMethod paymentMethod,
   }) async {
     final response = await _authenticatedRequest(
-      () => http.post(
+      () async => http.post(
         Uri.parse('$_baseUrl/rides/request'),
-        headers: _headers(authenticated: true),
+        headers: await _headers(authenticated: true),
         body: jsonEncode({
         'destination': destination,
         'category': category.name,
