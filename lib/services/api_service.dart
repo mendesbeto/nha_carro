@@ -136,6 +136,42 @@ class ApiService {
     return data;
   }
 
+  Future<void> requestPasswordReset({required String email}) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/auth/request-password-reset'),
+      headers: await _headers(),
+      body: jsonEncode({'email': email}),
+    );
+    if (response.statusCode >= 400) {
+      final data = _decodeBody(response);
+      throw Exception(
+        data['message'] ?? data['error'] ?? 'Não foi possível solicitar a recuperação.',
+      );
+    }
+  }
+
+  Future<void> resetPassword({
+    required String token,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/auth/reset-password'),
+      headers: await _headers(),
+      body: jsonEncode({
+        'token': token,
+        'password': password,
+        'passwordConfirmation': passwordConfirmation,
+      }),
+    );
+    if (response.statusCode >= 400) {
+      final data = _decodeBody(response);
+      throw Exception(
+        data['message'] ?? data['error'] ?? 'Não foi possível alterar a palavra-passe.',
+      );
+    }
+  }
+
   Future<Map<String, dynamic>> me() async {
     final response = await _authenticatedRequest(
       () async => http.get(
