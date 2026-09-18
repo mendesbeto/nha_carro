@@ -33,3 +33,13 @@ passageiro em uma solicitação de corrida vem do token, não do cliente.
 
 A solicitação de corrida sempre retorna uma tarifa estimada; sem coordenadas
 (o caso atual do Flutter) nenhuma corrida é inserida.
+
+## Recuperação de palavra-passe
+
+O backend disponibiliza recuperação de palavra-passe por token de uso único, com validade de 30 minutos. Configure no ambiente de produção:
+
+- `RESEND_API_KEY`: chave da API do Resend.
+- `EMAIL_FROM`: remetente verificado no Resend.
+- `PASSWORD_RESET_URL`: URL HTTPS confiável da página `/reset-password`.
+
+Após uma recuperação bem-sucedida, a versão da sessão do utilizador é incrementada e os refresh tokens existentes são revogados. Os access tokens emitidos antes da recuperação deixam de ser aceites pelo guard.
