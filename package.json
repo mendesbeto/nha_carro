@@ -9,7 +9,9 @@
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.0",
@@ -27,6 +29,7 @@
     "@nestjs/cli": "^11.0.0",
     "@types/bcrypt": "^5.0.2",
     "@types/node": "^22.0.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "@types/express": "^5.0.0"
   }
 }
