@@ -88,32 +88,77 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _resetPassword() async {
-    final email = _emailController.text.trim();
+    final controller = TextEditingController(text: _emailController.text.trim());
 
-    if (email.isEmpty || !email.contains('@')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Informe um e-mail válido para recuperar a senha.')),
-      );
-      return;
-    }
-
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Recuperar senha'),
-        content: Text(
-          'A recuperação automática por e-mail ainda não está configurada. '
-          'Por segurança, nenhum link foi enviado. Contacte o suporte para '
-          'iniciar a recuperação da sua conta.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Fechar'),
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Recuperar palavra-passe'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.emailAddress,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'E-mail',
+              hintText: 'nome@exemplo.com',
+            ),
           ),
-        ],
-      ),
-    );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final email = controller.text.trim();
+                if (!email.contains('@')) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Informe um e-mail válido.')),
+                  );
+                  return;
+                }
+
+                Navigator.of(dialogContext).pop();
+                try {
+                  await ApiService().requestPasswordReset(email: email);
+                  if (!mounted) return;
+                  await showDialog<void>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text('Verifique o seu e-mail'),
+                      content: const Text(
+                        'Se o e-mail estiver associado a uma conta, '
+                        'enviámos instruções para redefinir a palavra-passe. '
+                        'O link é válido durante 30 minutos.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Fechar'),
+                        ),
+                      ],
+                    ),
+                  );
+                } catch (error) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        error.toString().replaceFirst('Exception: ', ''),
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Enviar'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 
 
