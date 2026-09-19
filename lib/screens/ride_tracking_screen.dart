@@ -68,7 +68,10 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
     try {
       final ride = await _api.getRide(rideId);
       if (!mounted) return;
-      setState(() => _serverRide = ride);
+      setState(() {
+        _serverRide = ride;
+        _arrived = ride['status']?.toString() == 'CONCLUIDA';
+      });
       final status = ride['status']?.toString();
       if (status == 'CONCLUIDA' || status == 'CANCELADA') {
         _pollTimer?.cancel();
@@ -148,7 +151,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
             Text(
               _arrived
                   ? 'O motorista chegou!'
-                  : '$_tripStageLabel · ${_location.minutesAway} min',
+                  : _tripStageLabel,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
@@ -218,7 +221,6 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: LinearProgressIndicator(
-                  value: _location.progress,
                   minHeight: 6,
                 ),
               ),
