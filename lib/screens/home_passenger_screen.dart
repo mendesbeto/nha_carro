@@ -540,18 +540,32 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
     }
 
     setState(() => _loading = true);
-    final ride = await _api.requestRide(
-      destination: destination,
-      category: _category,
-      paymentMethod: _payment,
-    );
-    if (!mounted) return;
-    setState(() => _loading = false);
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => RideTrackingScreen(ride: ride),
-      ),
-    );
+
+    try {
+      final ride = await _api.requestRide(
+        destination: destination,
+        category: _category,
+        paymentMethod: _payment,
+        originLat: _currentLocation.latitude,
+        originLng: _currentLocation.longitude,
+      );
+
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => RideTrackingScreen(ride: ride),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   @override
