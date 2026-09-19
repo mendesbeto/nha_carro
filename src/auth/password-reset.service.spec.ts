@@ -23,9 +23,11 @@ describe('PasswordResetService', () => {
   it('updates the password using the recovery access token', async () => {
     const getUser = jest.fn().mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
     const updateUserById = jest.fn().mockResolvedValue({ error: null });
-    const service = new PasswordResetService({ getClient: () => ({ auth: { getUser, admin: { updateUserById } } }) } as never, { sendSupabasePasswordResetEmail: jest.fn() } as never);
+    const signOut = jest.fn().mockResolvedValue({ error: null });
+    const service = new PasswordResetService({ getClient: () => ({ auth: { getUser, admin: { updateUserById, signOut } } }) } as never, { sendSupabasePasswordResetEmail: jest.fn() } as never);
     await service.reset('recovery-access-token', 'newPassword1', 'newPassword1');
     expect(getUser).toHaveBeenCalledWith('recovery-access-token');
     expect(updateUserById).toHaveBeenCalledWith('user-1', { password: 'newPassword1' });
+    expect(signOut).toHaveBeenCalledWith('recovery-access-token');
   });
 });
