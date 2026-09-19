@@ -26,6 +26,7 @@ class ApiService {
     required String name,
     required String email,
     required String password,
+    required String telefone,
     required String role,
     String? vehicle,
     String? plate,
@@ -36,6 +37,7 @@ class ApiService {
       body: jsonEncode({
         'name': name,
         'email': email,
+        'telefone': telefone,
         'password': password,
         'role': role,
         'vehicle': vehicle,
