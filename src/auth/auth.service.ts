@@ -4,10 +4,7 @@ import {
   InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
 import { SupabaseService } from '../supabase/supabase.service';
-import { RefreshTokenService } from './refresh-token.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto, RegistrationRole } from './dto/register.dto';
 
@@ -23,10 +20,7 @@ export type AuthResponse = PublicUser & {
   refresh_token: string;
 };
 
-const ROLE_TO_DATABASE: Record<
-  RegistrationRole,
-  'PASSAGEIRO' | 'MOTORISTA'
-> = {
+const ROLE_TO_DATABASE: Record<RegistrationRole, 'PASSAGEIRO' | 'MOTORISTA'> = {
   passenger: 'PASSAGEIRO',
   driver: 'MOTORISTA',
 };
@@ -42,216 +36,149 @@ const DATABASE_TO_ROLE: Record<
 
 @Injectable()
 export class AuthService {
-  constructor(
-    private readonly supabase: SupabaseService,
-    private readonly jwtService: JwtService,
-    private readonly refreshTokenService: RefreshTokenService,
-  ) {}
+  constructor(private readonly supabase: SupabaseService) {}
 
   async register(dto: RegisterDto): Promise<AuthResponse> {
     const email = dto.email.trim().toLowerCase();
     const name = dto.name.trim();
     const client = this.supabase.getClient();
 
-    const existing = await client
-      .from('auth_credentials')
-      .select('usuario_id')
-      .eq('email', email)
-      .maybeSingle();
-    if (existing.error && !this.isMissingTable(existing.error)) {
-      throw new InternalServerErrorException(existing.error.message);
-    }
-    if (existing.data) {
-      throw new ConflictException('Este e-mail já está registrado.');
+    // Supabase Auth is the sole password store. Never write passwords or
+    // password hashes to public.auth_credentials.
+    const created = await client.auth.admin.createUser({
+      email,
+      password: dto.password,
+      email_confirm: true,
+      user_metadata: { full_name: name },
+    });
+
+    if (created.error || !created.data.user) {
+      if (created.error?.status === 422 || created.error?.code === 'email_exists') {
+        throw new ConflictException('Este e-mail já está registrado.');
+      }
+      throw new InternalServerErrorException(
+        created.error?.message ?? 'Não foi possível criar a conta.',
+      );
     }
 
-    const userResult = await client
+    const authUser = created.data.user;
+    const profile = await client
       .from('usuarios')
       .insert({
+        id: authUser.id,
         nome: name,
         telefone: email,
         tipo_perfil: ROLE_TO_DATABASE[dto.role],
       })
-      .select('id, nome, telefone, tipo_perfil, session_version')
+      .select('id, nome, telefone, tipo_perfil')
       .single();
 
-    if (userResult.error || !userResult.data) {
-      if (this.isDuplicateError(userResult.error)) {
+    if (profile.error || !profile.data) {
+      await client.auth.admin.deleteUser(authUser.id);
+      if (profile.error?.code === '23505') {
         throw new ConflictException('Este e-mail já está registrado.');
       }
       throw new InternalServerErrorException(
-        userResult.error?.message ?? 'Não foi possível criar o usuário.',
+        profile.error?.message ?? 'Não foi possível criar o perfil.',
       );
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, 12);
-    const credentialsResult = await client.from('auth_credentials').insert({
-      usuario_id: userResult.data.id,
-      email,
-      password_hash: passwordHash,
-    });
+    await this.saveVehicleIfProvided(client, dto, authUser.id);
 
-    if (credentialsResult.error) {
-      await client.from('usuarios').delete().eq('id', userResult.data.id);
-      if (this.isDuplicateError(credentialsResult.error)) {
-        throw new ConflictException('Este e-mail já está registrado.');
-      }
-      throw new InternalServerErrorException(credentialsResult.error.message);
+    // Return a normal Supabase Auth session so the same JWT can be used by
+    // Supabase RLS and by the NestJS API.
+    const signedIn = await client.auth.signInWithPassword({ email, password: dto.password });
+    if (signedIn.error || !signedIn.data.session) {
+      // The account exists; the client can retry login. Do not expose the
+      // service-role credential or manufacture a second JWT here.
+      throw new InternalServerErrorException(
+        signedIn.error?.message ?? 'Conta criada, mas não foi possível iniciar a sessão.',
+      );
     }
 
-    await this.saveVehicleIfProvided(client, dto, userResult.data.id);
-    const user = this.toPublicUser(userResult.data, email);
-
-    return {
-      ...user,
-      access_token: await this.createAccessToken(
-        user,
-        userResult.data.session_version,
-      ),
-      refresh_token: await this.refreshTokenService.issue(user.id),
-    };
+    return this.toAuthResponse(profile.data, email, signedIn.data.session);
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {
     const email = dto.email.trim().toLowerCase();
     const client = this.supabase.getClient();
-    const credentialsResult = await client
-      .from('auth_credentials')
-      .select('usuario_id, email, password_hash')
-      .eq('email', email)
-      .maybeSingle();
 
-    if (credentialsResult.error || !credentialsResult.data) {
+    const signedIn = await client.auth.signInWithPassword({
+      email,
+      password: dto.password,
+    });
+
+    if (signedIn.error || !signedIn.data.user || !signedIn.data.session) {
       throw new UnauthorizedException('Credenciais inválidas.');
     }
 
-    const passwordMatches = await bcrypt.compare(
-      dto.password,
-      credentialsResult.data.password_hash,
-    );
-    if (!passwordMatches) {
-      throw new UnauthorizedException('Credenciais inválidas.');
-    }
-
-    const userResult = await client
+    const profile = await client
       .from('usuarios')
-      .select(
-        'id, nome, telefone, tipo_perfil, status_conta, session_version',
-      )
-      .eq('id', credentialsResult.data.usuario_id)
+      .select('id, nome, telefone, tipo_perfil, status_conta')
+      .eq('id', signedIn.data.user.id)
       .maybeSingle();
-    if (userResult.error || !userResult.data) {
-      throw new UnauthorizedException('Credenciais inválidas.');
+
+    if (profile.error || !profile.data) {
+      throw new UnauthorizedException('Perfil de usuário não encontrado.');
     }
-    if (userResult.data.status_conta === 'BLOQUEADO') {
+    if (profile.data.status_conta === 'BLOQUEADO') {
+      await client.auth.admin.signOut(signedIn.data.user.id);
       throw new UnauthorizedException('Esta conta está bloqueada.');
     }
 
-    const user = this.toPublicUser(
-      userResult.data,
-      credentialsResult.data.email,
-    );
-
-    return {
-      ...user,
-      access_token: await this.createAccessToken(
-        user,
-        userResult.data.session_version,
-      ),
-      refresh_token: await this.refreshTokenService.issue(user.id),
-    };
+    return this.toAuthResponse(profile.data, signedIn.data.user.email ?? email, signedIn.data.session);
   }
 
   async refresh(rawRefreshToken: string): Promise<AuthResponse> {
-    const rotated = await this.refreshTokenService.rotate(rawRefreshToken);
-    const session = await this.getUserById(rotated.userId);
-    const user = session.user;
+    const client = this.supabase.getClient();
+    const refreshed = await client.auth.refreshSession({
+      refresh_token: rawRefreshToken,
+    });
 
-    return {
-      ...user,
-      access_token: await this.createAccessToken(user, session.sessionVersion),
-      refresh_token: rotated.refreshToken,
-    };
+    if (refreshed.error || !refreshed.data.user || !refreshed.data.session) {
+      throw new UnauthorizedException('Refresh token inválido, expirado ou revogado.');
+    }
+
+    const profile = await client
+      .from('usuarios')
+      .select('id, nome, telefone, tipo_perfil, status_conta')
+      .eq('id', refreshed.data.user.id)
+      .maybeSingle();
+
+    if (profile.error || !profile.data || profile.data.status_conta === 'BLOQUEADO') {
+      throw new UnauthorizedException('Sessão inválida.');
+    }
+
+    return this.toAuthResponse(
+      profile.data,
+      refreshed.data.user.email ?? '',
+      refreshed.data.session,
+    );
   }
 
   async logout(rawRefreshToken: string): Promise<void> {
-    await this.refreshTokenService.revoke(rawRefreshToken);
+    const client = this.supabase.getClient();
+    const refreshed = await client.auth.refreshSession({
+      refresh_token: rawRefreshToken,
+    });
+    if (refreshed.data.user) {
+      await client.auth.admin.signOut(refreshed.data.user.id);
+    }
   }
 
-  async getUserFromToken(payload: { sub: string; role: PublicUser['role'] }) {
+  async getUserFromToken(payload: { sub: string; email: string; role: PublicUser['role'] }) {
     const client = this.supabase.getClient();
     const result = await client
       .from('usuarios')
-      .select('id, nome, telefone, tipo_perfil, status_conta, session_version')
+      .select('id, nome, telefone, tipo_perfil, status_conta')
       .eq('id', payload.sub)
       .maybeSingle();
 
-    if (
-      result.error ||
-      !result.data ||
-      result.data.status_conta === 'BLOQUEADO'
-    ) {
+    if (result.error || !result.data || result.data.status_conta === 'BLOQUEADO') {
       throw new UnauthorizedException('Sessão inválida.');
     }
 
-    const credentialsResult = await client
-      .from('auth_credentials')
-      .select('email')
-      .eq('usuario_id', payload.sub)
-      .maybeSingle();
-
-    if (credentialsResult.error || !credentialsResult.data?.email) {
-      throw new UnauthorizedException('Sessão inválida.');
-    }
-
-    return this.toPublicUser(result.data, credentialsResult.data.email);
-  }
-
-  private async getUserById(
-    userId: string,
-  ): Promise<{ user: PublicUser; sessionVersion: number }> {
-    const result = await this.supabase
-      .getClient()
-      .from('usuarios')
-      .select('id, nome, telefone, tipo_perfil, status_conta, session_version')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (
-      result.error ||
-      !result.data ||
-      result.data.status_conta === 'BLOQUEADO'
-    ) {
-      throw new UnauthorizedException('Sessão inválida.');
-    }
-
-    const credentials = await this.supabase
-      .getClient()
-      .from('auth_credentials')
-      .select('email')
-      .eq('usuario_id', userId)
-      .maybeSingle();
-
-    if (credentials.error || !credentials.data?.email) {
-      throw new UnauthorizedException('Sessão inválida.');
-    }
-
-    return {
-      user: this.toPublicUser(result.data, credentials.data.email),
-      sessionVersion: result.data.session_version,
-    };
-  }
-
-  private createAccessToken(
-    user: PublicUser,
-    sessionVersion: number,
-  ): Promise<string> {
-    return this.jwtService.signAsync({
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      sv: sessionVersion,
-    });
+    return this.toPublicUser(result.data, payload.email);
   }
 
   private async saveVehicleIfProvided(
@@ -263,13 +190,34 @@ export class AuthService {
       return;
     }
 
-    await client.from('veiculos_motoristas').insert({
+    const result = await client.from('veiculos_motoristas').insert({
       motorista_id: userId,
       placa: dto.plate.trim(),
       marca_modelo: dto.vehicle.trim(),
       cor: 'Não informada',
       categoria: 'TAXI_TRADICIONAL',
     });
+
+    if (result.error) {
+      throw new InternalServerErrorException('Não foi possível cadastrar o veículo.');
+    }
+  }
+
+  private toAuthResponse(
+    user: {
+      id: string;
+      nome: string;
+      telefone: string;
+      tipo_perfil: 'PASSAGEIRO' | 'MOTORISTA' | 'ADMIN';
+    },
+    email: string,
+    session: { access_token: string; refresh_token: string },
+  ): AuthResponse {
+    return {
+      ...this.toPublicUser(user, email),
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    };
   }
 
   private toPublicUser(
@@ -287,13 +235,5 @@ export class AuthService {
       email,
       role: DATABASE_TO_ROLE[user.tipo_perfil],
     };
-  }
-
-  private isDuplicateError(error: { code?: string } | null): boolean {
-    return error?.code === '23505';
-  }
-
-  private isMissingTable(error: { code?: string } | null): boolean {
-    return error?.code === '42P01';
   }
 }
