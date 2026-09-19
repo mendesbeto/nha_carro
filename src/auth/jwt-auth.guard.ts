@@ -13,7 +13,10 @@ export type AuthenticatedUser = {
   role: 'passenger' | 'driver' | 'admin';
 };
 
-export type AuthenticatedRequest = Request & { user: AuthenticatedUser };
+export type AuthenticatedRequest = Request & {
+  user: AuthenticatedUser;
+  accessToken: string;
+};
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -61,6 +64,7 @@ export class JwtAuthGuard implements CanActivate {
         email: authUser.email ?? '',
         role,
       };
+      request.accessToken = token;
       return true;
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
