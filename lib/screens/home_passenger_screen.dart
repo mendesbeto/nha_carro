@@ -228,8 +228,28 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
 
   Future<void> _loadHistory() async {
     final history = await _historyService.loadHistory();
-    final wallet = await _historyService.loadWalletBalance();
-    final transactions = await _historyService.loadTransactions();
+    final localWallet = await _historyService.loadWalletBalance();
+    final localTransactions = await _historyService.loadTransactions();
+    var wallet = localWallet;
+    var transactions = localTransactions;
+    try {
+      final remote = await _api.getWallet();
+      wallet = (remote['balance'] as num?)?.round() ?? localWallet;
+      final remoteTransactions = remote['transactions'];
+      if (remoteTransactions is List) {
+        transactions = remoteTransactions
+            .whereType<Map>()
+            .map((entry) => <String, dynamic>{
+                  'label': entry['tipo']?.toString() ?? 'Transação',
+                  'amount': (entry['valor'] as num?)?.round() ?? 0,
+                  'type': ((entry['valor'] as num?) ?? 0) >= 0 ? 'credit' : 'debit',
+                  'date': entry['criado_em']?.toString() ?? '',
+                })
+            .toList();
+      }
+    } catch (_) {
+      // Keep the local cache only as an offline fallback.
+    }
     if (!mounted) return;
     setState(() {
       _tripHistory
@@ -311,7 +331,11 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
 
     if (amount == null || !mounted) return;
 
-    await _historyService.addWalletCredit(amount);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('O carregamento da carteira será disponibilizado após integração com o provedor de pagamento.'),
+      ),
+    );
     await _loadHistory();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
