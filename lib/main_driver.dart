@@ -159,25 +159,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
   }
 
-  void _advanceRideStage(RideStage nextStage) {
-    final currentRide = RideLifecycleService.instance.currentRide;
-    if (currentRide == null) return;
-
-    RideLifecycleService.instance.updateRideStage(nextStage);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Estado atualizado: $_activeRideStatus')),
-    );
-    setState(() {});
-  }
-
-  void _clearCurrentRide() {
-    RideLifecycleService.instance.clear();
-    setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Corrida finalizada e painel resetado.')),
-    );
-  }
-
   Future<void> _logout() async {
     await ApiService().logout();
     if (!mounted) return;
@@ -329,7 +310,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         child: _MiniStat(
                           label: 'Próximas',
                           value:
-                              '${_incomingRides.length + (RideLifecycleService.instance.currentRide != null ? 1 : 0)}',
+                              '${_incomingRides.length + (_activeRide != null ? 1 : 0)}',
                         ),
                       ),
                     ],
