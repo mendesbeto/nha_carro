@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Param,
   Patch,
   Post,
@@ -18,6 +19,15 @@ import { RidesService } from './rides.service';
 @Controller('api/rides')
 export class RidesController {
   constructor(private readonly ridesService: RidesService) {}
+
+  @Get('available')
+  @UseGuards(JwtAuthGuard)
+  available(
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentAccessToken() accessToken: string,
+  ) {
+    return this.ridesService.available(user, accessToken);
+  }
 
   @Patch(':rideId/accept')
   @UseGuards(JwtAuthGuard)
