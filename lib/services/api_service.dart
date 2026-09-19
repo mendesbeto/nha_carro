@@ -190,28 +190,31 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> acceptRide(String rideId) =>
-      _authenticatedRequest(
-        'PATCH',
-        '/rides/$rideId/accept',
-      );
+      _rideAction('/rides/$rideId/accept');
 
   Future<Map<String, dynamic>> startRide(String rideId) =>
-      _authenticatedRequest(
-        'PATCH',
-        '/rides/$rideId/start',
-      );
+      _rideAction('/rides/$rideId/start');
 
   Future<Map<String, dynamic>> completeRide(String rideId) =>
-      _authenticatedRequest(
-        'PATCH',
-        '/rides/$rideId/complete',
-      );
+      _rideAction('/rides/$rideId/complete');
 
   Future<Map<String, dynamic>> cancelRide(String rideId) =>
-      _authenticatedRequest(
-        'PATCH',
-        '/rides/$rideId/cancel',
-      );
+      _rideAction('/rides/$rideId/cancel');
+
+  Future<Map<String, dynamic>> _rideAction(String path) async {
+    final response = await _authenticatedRequest(
+      () async => http.patch(
+        Uri.parse('$_baseUrl$path'),
+        headers: await _headers(authenticated: true),
+      ),
+    );
+
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(data['error'] ?? 'Não foi possível atualizar a corrida.');
+    }
+    return data;
+  }
 
   Future<RideRequest> requestRide({
     required String destination,
