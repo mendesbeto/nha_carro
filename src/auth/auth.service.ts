@@ -167,9 +167,12 @@ export class AuthService {
     const refreshed = await client.auth.refreshSession({
       refresh_token: rawRefreshToken,
     });
-    if (refreshed.data.user) {
-      await client.auth.admin.signOut(refreshed.data.session.access_token);
+
+    if (refreshed.error || !refreshed.data.user || !refreshed.data.session) {
+      return;
     }
+
+    await client.auth.admin.signOut(refreshed.data.session.access_token);
   }
 
   async getUserFromToken(payload: { sub: string; email: string; role: PublicUser['role'] }) {
