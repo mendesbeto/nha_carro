@@ -50,15 +50,40 @@ export class SupabaseService {
       );
     }
 
-    // Each operation gets an isolated client. signInWithPassword() and
-    // refreshSession() mutate the client's in-memory session; sharing one
-    // client between concurrent users could otherwise mix Authorization
-    // headers across requests.
     return createClient(this.authUrl, this.authKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
         detectSessionInUrl: false,
+      },
+    });
+  }
+
+  getUserClient(accessToken: string): SupabaseClient {
+    if (!this.authUrl || !this.authKey) {
+      throw new ServiceUnavailableException(
+        'Supabase Auth não está configurado no servidor.',
+      );
+    }
+    if (!accessToken) {
+      throw new ServiceUnavailableException(
+        'Token de acesso não informado.',
+      );
+    }
+
+    // Bind the caller's JWT to this client so database requests carry the
+    // same identity that was validated by Supabase Auth and can be checked
+    // by PostgreSQL RLS.
+    return createClient(this.authUrl, this.authKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+      },
+      global: {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       },
     });
   }
