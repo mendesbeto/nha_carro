@@ -30,12 +30,12 @@ export class PasswordResetPageController {
       `<form method="post" action="/reset-password">
         <input type="hidden" name="token" value="${this.escape(token)}">
         <label for="password">Nova palavra-passe</label>
-        <input id="password" name="password" type="password" minlength="6" maxlength="128" required autocomplete="new-password">
+        <input id="password" name="password" type="password" minlength="8" maxlength="128" required autocomplete="new-password">
         <label for="passwordConfirmation">Confirmar palavra-passe</label>
-        <input id="passwordConfirmation" name="passwordConfirmation" type="password" minlength="6" maxlength="128" required autocomplete="new-password">
+        <input id="passwordConfirmation" name="passwordConfirmation" type="password" minlength="8" maxlength="128" required autocomplete="new-password">
         <button type="submit">Alterar palavra-passe</button>
       </form>
-      <p>O link expira em 30 minutos e só pode ser usado uma vez.</p>`,
+      <p>A palavra-passe deve ter pelo menos 8 caracteres. O link expira em 30 minutos e só pode ser usado uma vez.</p>`,
     );
   }
 
