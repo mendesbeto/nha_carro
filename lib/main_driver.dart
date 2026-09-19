@@ -35,23 +35,12 @@ class DriverHomeScreen extends StatefulWidget {
 
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
   final AuthService _authService = AuthService();
+  final ApiService _api = ApiService();
+  List<Map<String, dynamic>> _incomingRides = [];
+  Map<String, dynamic>? _activeRide;
+  bool _loadingRides = false;
   bool _online = false;
-  final List<Map<String, dynamic>> _incomingRides = [
-    {
-      'from': 'Aeroporto de Bissau',
-      'to': 'Centro Comercial de Bandim',
-      'fare': '3.500 CFA',
-      'time': '5 min',
-      'passenger': 'Aisha P.',
-    },
-    {
-      'from': 'Mercado de Bandim',
-      'to': 'Praia de Bissau',
-      'fare': '2.800 CFA',
-      'time': '8 min',
-      'passenger': 'Mário N.',
-    },
-  ];
+
   final List<Map<String, dynamic>> _recentTrips = [
     {
       'route': 'Aeroporto → Bandim',
@@ -73,6 +62,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       final savedStatus = await _authService.loadDriverAvailability();
       if (!mounted) return;
       setState(() => _online = savedStatus);
+      if (savedStatus) await _loadAvailableRides();
     });
   }
 
@@ -94,30 +84,93 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
   }
 
-  void _toggleOnline(bool value) {
+  Future<void> _toggleOnline(bool value) async {
     setState(() => _online = value);
-    _authService.saveDriverAvailability(value);
+    await _authService.saveDriverAvailability(value);
+    if (value) {
+      await _loadAvailableRides();
+    } else if (mounted) {
+      setState(() => _incomingRides = []);
+    }
   }
 
-  void _acceptRide(Map<String, dynamic> ride) {
+  Future<void> _loadAvailableRides() async {
+    if (!_online) return;
+    setState(() => _loadingRides = true);
+    try {
+      final rides = await _api.getAvailableRides();
+      if (!mounted) return;
+      setState(() => _incomingRides = rides);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingRides = false);
+    }
+  }
+
+  Future<void> _acceptRide(Map<String, dynamic> ride) async {
     if (!_online) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Ative o modo online antes de aceitar uma corrida.')),
+        const SnackBar(content: Text('Ative o modo online antes de aceitar uma corrida.')),
       );
       return;
     }
+    final rideId = ride['rideId']?.toString();
+    if (rideId == null || rideId.isEmpty) return;
 
-    RideLifecycleService.instance.acceptRide(ride);
-    setState(() {
-      _incomingRides.removeWhere((item) =>
-          item['passenger'] == ride['passenger'] && item['to'] == ride['to']);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content:
-              Text('Corrida aceita: ${ride['passenger']} → ${ride['to']}')),
-    );
+    try {
+      final accepted = await _api.acceptRide(rideId);
+      if (!mounted) return;
+      setState(() {
+        _activeRide = accepted;
+        _incomingRides.removeWhere((item) => item['rideId']?.toString() == rideId);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Corrida aceita no servidor.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+      await _loadAvailableRides();
+    }
+  }
+
+  Future<void> _startRide() async {
+    final rideId = _activeRide?['rideId']?.toString();
+    if (rideId == null || rideId.isEmpty) return;
+    try {
+      final result = await _api.startRide(rideId);
+      if (!mounted) return;
+      setState(() => _activeRide = result);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<void> _completeRide() async {
+    final rideId = _activeRide?['rideId']?.toString();
+    if (rideId == null || rideId.isEmpty) return;
+    try {
+      final result = await _api.completeRide(rideId);
+      if (!mounted) return;
+      setState(() => _activeRide = result);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Corrida concluída e liquidação processada.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
   }
 
   void _advanceRideStage(RideStage nextStage) {
@@ -181,7 +234,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final activeRide = RideLifecycleService.instance.currentRide;
+    final activeRide = _activeRide;
     final currentStage = RideLifecycleService.instance.currentStage;
 
     return Scaffold(
