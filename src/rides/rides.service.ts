@@ -24,7 +24,11 @@ const PAYMENT_METHODS: Record<string, 'DINHEIRO' | 'ORANGE_MONEY' | 'MTN_MONEY'>
 export class RidesService {
   constructor(private readonly supabase: SupabaseService) {}
 
-  async request(dto: RequestRideDto, user: CurrentUserPayload) {
+  async request(
+    dto: RequestRideDto,
+    user: CurrentUserPayload,
+    accessToken: string,
+  ) {
     if (user.role !== 'passenger') {
       throw new ForbiddenException('Apenas passageiros podem solicitar viagens.');
     }
@@ -65,7 +69,7 @@ export class RidesService {
       return response;
     }
 
-    const client = this.supabase.getClient();
+    const client = this.supabase.getUserClient(accessToken);
     const passenger = await client
       .from('usuarios')
       .select('id')
