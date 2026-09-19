@@ -27,6 +27,11 @@ export class PasswordResetService {
     );
   }
 
+  async reset(rawToken: string, password: string, passwordConfirmation: string): Promise<void> {
+    // Legacy endpoint retained temporarily for source compatibility. New recovery links use Supabase Auth access tokens.
+    return this.resetWithAccessToken(rawToken, password, passwordConfirmation);
+  }
+
   async resetWithAccessToken(
     accessToken: string,
     password: string,
