@@ -17,9 +17,19 @@ async function bootstrap(): Promise<void> {
     'PASSWORD_RESET_URL',
   ];
   const missingEnv = requiredEnv.filter((key) => !config.get<string>(key)?.trim());
+  const hasAuthClientKey = Boolean(
+    config.get<string>('SUPABASE_PUBLISHABLE_KEY')?.trim() ||
+      config.get<string>('SUPABASE_ANON_KEY')?.trim(),
+  );
 
-  if (missingEnv.length > 0) {
-    throw new Error(`Missing required environment variables: ${missingEnv.join(', ')}`);
+  if (missingEnv.length > 0 || !hasAuthClientKey) {
+    const missing = [...missingEnv];
+    if (!hasAuthClientKey) {
+      missing.push('SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY');
+    }
+    throw new Error(
+      `Missing required environment variables: ${missing.join(', ')}`,
+    );
   }
 
   const configuredOrigins = config
