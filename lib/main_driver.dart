@@ -80,6 +80,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
   }
 
+  Future<void> _toggleOnline(bool value) async {
+    await _authService.saveDriverAvailability(value);
+    if (!mounted) return;
+    setState(() {
+      _online = value;
+      if (!value) _incomingRides = [];
+    });
+    if (value) await _loadAvailableRides();
+  }
+
   Future<void> _loadAvailableRides() async {
     if (!_online) return;
     setState(() => _loadingRides = true);
@@ -371,76 +381,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ),
           if (activeRide != null) ...[
             const SizedBox(height: 20),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Corrida ativa',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 8),
-                    Text('ID: ${activeRide['rideId'] ?? '—'}',
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 8),
-                    Text('Estado: $_activeRideStatus',
-                        style: const TextStyle(
-                            color: Color(0xFF0B8F62),
-                            fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 14),
-                    if (activeRide['status'] == 'ACEITA')
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: _startRide,
-                          icon: const Icon(Icons.play_arrow_rounded),
-                          label: const Text('Iniciar viagem'),
-                        ),
-                      ),
-                    if (activeRide['status'] == 'EM_ANDAMENTO')
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: _completeRide,
-                          icon: const Icon(Icons.flag_rounded),
-                          label: const Text('Concluir viagem'),
-                        ),
-                      ),
-                    if (activeRide['status'] == 'CONCLUIDA')
-                      const Text('A corrida foi concluída no servidor.',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 20),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Corrida ativa: ${activeRide['passenger']}',
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 8),
-                    Text('Origem: ${activeRide['from']}'),
-                    const SizedBox(height: 4),
-                    Text('Destino: ${activeRide['to']}'),
-                    const SizedBox(height: 8),
-                    Text('Estado: $_activeRideStatus',
-                        style: const TextStyle(
-                            color: Color(0xFF0B8F62),
-                            fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 20),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -592,32 +532,6 @@ class _QuickActionButton extends StatelessWidget {
           const SizedBox(width: 6),
           Text(label),
         ],
-      ),
-    );
-  }
-}
-
-class _StageChip extends StatelessWidget {
-  const _StageChip({
-    required this.label,
-    required this.enabled,
-    required this.onPressed,
-  });
-
-  final String label;
-  final bool enabled;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return ChoiceChip(
-      label: Text(label),
-      selected: enabled,
-      onSelected: (_) => onPressed(),
-      selectedColor: const Color(0xFFE0F5EA),
-      labelStyle: TextStyle(
-        color: enabled ? const Color(0xFF0B8F62) : Colors.black87,
-        fontWeight: FontWeight.w700,
       ),
     );
   }
