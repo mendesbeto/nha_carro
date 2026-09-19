@@ -122,7 +122,7 @@ export class AuthService {
       throw new UnauthorizedException('Perfil de usuário não encontrado.');
     }
     if (profile.data.status_conta === 'BLOQUEADO') {
-      await client.auth.admin.signOut(signedIn.data.user.id);
+      await client.auth.admin.signOut(signedIn.data.session.access_token);
       throw new UnauthorizedException('Esta conta está bloqueada.');
     }
 
@@ -162,7 +162,7 @@ export class AuthService {
       refresh_token: rawRefreshToken,
     });
     if (refreshed.data.user) {
-      await client.auth.admin.signOut(refreshed.data.user.id);
+      await client.auth.admin.signOut(refreshed.data.session.access_token);
     }
   }
 
