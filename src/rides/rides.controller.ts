@@ -44,9 +44,8 @@ export class RidesController {
   complete(
     @Param('rideId') rideId: string,
     @CurrentUser() user: CurrentUserPayload,
-    @CurrentAccessToken() accessToken: string,
   ) {
-    return this.ridesService.complete(rideId, user, accessToken);
+    return this.ridesService.complete(rideId, user);
   }
 
   @Patch(':rideId/cancel')
