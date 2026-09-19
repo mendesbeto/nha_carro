@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../models/ride_request.dart';
+import '../services/api_service.dart';
 import '../services/ride_lifecycle_service.dart';
 import '../services/socket_service.dart';
 
@@ -18,6 +19,7 @@ class RideTrackingScreen extends StatefulWidget {
 
 class _RideTrackingScreenState extends State<RideTrackingScreen> {
   final _socket = SocketService();
+  final _api = ApiService();
   StreamSubscription<DriverLocation>? _subscription;
   DriverLocation _location = const DriverLocation(progress: 0, minutesAway: 6);
   bool _arrived = false;
@@ -249,13 +251,34 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                         );
 
                         if (confirmed == true && mounted) {
-                          setState(() => _cancelled = true);
-                          RideLifecycleService.instance.updateRideStage(RideStage.cancelled);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Viagem cancelada. Reembolso em processamento.'),
-                            ),
-                          );
+                          final rideId = widget.ride.rideId;
+                          if (rideId == null || rideId.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Não foi possível identificar a corrida para cancelamento.'),
+                              ),
+                            );
+                            return;
+                          }
+
+                          try {
+                            await _api.cancelRide(rideId);
+                            if (!mounted) return;
+                            setState(() => _cancelled = true);
+                            RideLifecycleService.instance.updateRideStage(RideStage.cancelled);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Viagem cancelada.')),
+                            );
+                          } catch (error) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  error.toString().replaceFirst('Exception: ', ''),
+                                ),
+                              ),
+                            );
+                          }
                         }
                       },
                       icon: const Icon(Icons.cancel_outlined),
