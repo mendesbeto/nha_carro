@@ -193,6 +193,10 @@ class ApiService {
     required String destination,
     required RideCategory category,
     required PaymentMethod paymentMethod,
+    required double originLat,
+    required double originLng,
+    double? destinationLat,
+    double? destinationLng,
   }) async {
     final response = await _authenticatedRequest(
       () async => http.post(
@@ -202,6 +206,10 @@ class ApiService {
           'destination': destination,
           'category': category.name,
           'paymentMethod': paymentMethod.name,
+          'originLat': originLat,
+          'originLng': originLng,
+          if (destinationLat != null) 'destinationLat': destinationLat,
+          if (destinationLng != null) 'destinationLng': destinationLng,
         }),
       ),
     );
