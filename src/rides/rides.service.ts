@@ -7,6 +7,7 @@ import {
 import { SupabaseService } from '../supabase/supabase.service';
 import { RequestRideDto } from './dto/request-ride.dto';
 import { CurrentUserPayload } from '../auth/current-user.decorator';
+import { WalletService } from '../wallet/wallet.service';
 
 const FARES: Record<string, number> = {
   taxi: 2500,
@@ -22,7 +23,10 @@ const PAYMENT_METHODS: Record<string, 'DINHEIRO' | 'ORANGE_MONEY' | 'MTN_MONEY'>
 
 @Injectable()
 export class RidesService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly walletService: WalletService,
+  ) {}
 
 
   async accept(
@@ -57,15 +61,12 @@ export class RidesService {
   async complete(
     rideId: string,
     user: CurrentUserPayload,
-    accessToken: string,
   ) {
     if (user.role !== 'driver') {
       throw new ForbiddenException('Apenas motoristas podem concluir viagens.');
     }
 
-    return this.transition(rideId, user, accessToken, {
-      status: 'CONCLUIDA',
-    });
+    return this.walletService.completeRideSettlement(rideId, user);
   }
 
   async cancel(
