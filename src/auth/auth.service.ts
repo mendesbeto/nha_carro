@@ -83,7 +83,13 @@ export class AuthService {
       );
     }
 
-    await this.saveVehicleIfProvided(client, dto, authUser.id);
+    try {
+      await this.saveVehicleIfProvided(client, dto, authUser.id);
+    } catch (error) {
+      await client.from('usuarios').delete().eq('id', authUser.id);
+      await client.auth.admin.deleteUser(authUser.id);
+      throw error;
+    }
 
     // Return a normal Supabase Auth session so the same JWT can be used by
     // Supabase RLS and by the NestJS API.
