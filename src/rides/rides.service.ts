@@ -58,15 +58,25 @@ export class RidesService {
       persisted: false,
     };
 
-    const coordinatesProvided = [
-      dto.originLat,
-      dto.originLng,
-      dto.destinationLat,
-      dto.destinationLng,
-    ].every((value) => value !== undefined);
+    const originProvided =
+      dto.originLat !== undefined && dto.originLng !== undefined;
 
-    if (!coordinatesProvided) {
-      return response;
+    if (!originProvided) {
+      throw new BadRequestException(
+        'Não foi possível determinar a localização de origem da viagem.',
+      );
+    }
+
+    const destinationProvided =
+      dto.destinationLat !== undefined && dto.destinationLng !== undefined;
+
+    if (
+      (dto.destinationLat !== undefined) !==
+      (dto.destinationLng !== undefined)
+    ) {
+      throw new BadRequestException(
+        'As coordenadas de destino devem ser informadas em conjunto.',
+      );
     }
 
     const client = this.supabase.getUserClient(accessToken);
@@ -88,10 +98,12 @@ export class RidesService {
           type: 'Point',
           coordinates: [dto.originLng, dto.originLat],
         },
-        destino_coords: {
-          type: 'Point',
-          coordinates: [dto.destinationLng, dto.destinationLat],
-        },
+        destino_coords: destinationProvided
+          ? {
+              type: 'Point',
+              coordinates: [dto.destinationLng, dto.destinationLat],
+            }
+          : null,
         valor_total: estimatedFare,
         valor_comissao: Math.round(estimatedFare * 0.2 * 100) / 100,
         forma_pagamento: PAYMENT_METHODS[paymentMethod],
