@@ -12,33 +12,38 @@ function makeChain(result: unknown) {
 }
 
 describe('AuthService', () => {
-  let supabase: { getClient: jest.Mock };
+  let supabase: { getClient: jest.Mock; getAuthClient: jest.Mock };
   let auth: AuthService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    supabase = { getClient: jest.fn() };
+    supabase = { getClient: jest.fn(), getAuthClient: jest.fn() };
     auth = new AuthService(supabase as never);
   });
 
   it('registers a passenger through Supabase Auth and returns a session', async () => {
     const profile = makeChain({ data: { id: 'user-1', nome: 'Beto', telefone: '+2459000000', tipo_perfil: 'PASSAGEIRO' }, error: null });
-    const client: any = {
+    const adminClient: any = {
       auth: {
         admin: { createUser: jest.fn().mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null }) },
+      },
+      from: jest.fn(() => profile),
+    };
+    const authClient: any = {
+      auth: {
         signInWithPassword: jest.fn().mockResolvedValue({
           data: { session: { access_token: 'access-token', refresh_token: 'refresh-token' }, user: { id: 'user-1', email: 'beto@example.com' } },
           error: null,
         }),
       },
-      from: jest.fn(() => profile),
     };
-    supabase.getClient.mockReturnValue(client);
+    supabase.getClient.mockReturnValue(adminClient);
+    supabase.getAuthClient.mockReturnValue(authClient);
 
     const result = await auth.register({ name: ' Beto ', email: ' Beto@Example.COM ', telefone: '+2459000000', password: 'secret123', role: 'passenger' });
 
     expect(result).toMatchObject({ id: 'user-1', name: 'Beto', email: 'beto@example.com', role: 'passenger', access_token: 'access-token', refresh_token: 'refresh-token' });
-    expect(client.auth.admin.createUser).toHaveBeenCalledWith(expect.objectContaining({ email: 'beto@example.com', password: 'secret123', email_confirm: true }));
+    expect(authClient.auth.signInWithPassword).toHaveBeenCalledWith({ email: 'beto@example.com', password: 'secret123' });
   });
 
   it('rejects registration when the email already exists', async () => {
@@ -50,7 +55,7 @@ describe('AuthService', () => {
 
   it('rejects invalid login credentials', async () => {
     const client = { auth: { signInWithPassword: jest.fn().mockResolvedValue({ data: { user: null, session: null }, error: { message: 'Invalid login credentials' } }) } };
-    supabase.getClient.mockReturnValue(client);
+    supabase.getAuthClient.mockReturnValue(client);
 
     await expect(auth.login({ email: 'beto@example.com', password: 'wrongpass' })).rejects.toBeInstanceOf(UnauthorizedException);
   });
@@ -58,14 +63,14 @@ describe('AuthService', () => {
   it('rejects a blocked account after authentication', async () => {
     const profile = makeChain({ data: { id: 'user-1', nome: 'Beto', telefone: '+2459000000', tipo_perfil: 'PASSAGEIRO', status_conta: 'BLOQUEADO' }, error: null });
     const signOut = jest.fn().mockResolvedValue({ error: null });
-    const client: any = {
+    const authClient: any = {
       auth: {
         signInWithPassword: jest.fn().mockResolvedValue({ data: { user: { id: 'user-1', email: 'beto@example.com' }, session: { access_token: 'access-token', refresh_token: 'refresh-token' } }, error: null }),
-        admin: { signOut },
       },
       from: jest.fn(() => profile),
     };
-    supabase.getClient.mockReturnValue(client);
+    supabase.getAuthClient.mockReturnValue(authClient);
+    supabase.getClient.mockReturnValue({ auth: { admin: { signOut } } });
 
     await expect(auth.login({ email: 'beto@example.com', password: 'secret123' })).rejects.toBeInstanceOf(UnauthorizedException);
     expect(signOut).toHaveBeenCalledWith('access-token');
