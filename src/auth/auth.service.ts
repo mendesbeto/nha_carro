@@ -67,7 +67,7 @@ export class AuthService {
       .insert({
         id: authUser.id,
         nome: name,
-        telefone: email,
+        telefone: dto.telefone.trim(),
         tipo_perfil: ROLE_TO_DATABASE[dto.role],
       })
       .select('id, nome, telefone, tipo_perfil')
@@ -76,7 +76,7 @@ export class AuthService {
     if (profile.error || !profile.data) {
       await client.auth.admin.deleteUser(authUser.id);
       if (profile.error?.code === '23505') {
-        throw new ConflictException('Este e-mail já está registrado.');
+        throw new ConflictException('Este e-mail ou telefone já está registrado.');
       }
       throw new InternalServerErrorException(
         profile.error?.message ?? 'Não foi possível criar o perfil.',
