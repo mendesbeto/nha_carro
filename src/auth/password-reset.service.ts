@@ -53,5 +53,8 @@ export class PasswordResetService {
     if (updated.error) {
       throw new BadRequestException('Não foi possível alterar a palavra-passe.');
     }
+
+    // Revoke all refresh-token sessions after a password reset.
+    await client.auth.admin.signOut(accessToken);
   }
 }
