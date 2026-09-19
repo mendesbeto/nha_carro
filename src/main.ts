@@ -11,7 +11,6 @@ async function bootstrap(): Promise<void> {
   const requiredEnv = [
     'SUPABASE_URL',
     'SUPABASE_SERVICE_ROLE_KEY',
-    'JWT_SECRET',
     'CORS_ORIGINS',
     'RESEND_API_KEY',
     'EMAIL_FROM',
