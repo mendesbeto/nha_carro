@@ -1,5 +1,9 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
-import { CurrentUser, CurrentUserPayload } from '../auth/current-user.decorator';
+import {
+  CurrentAccessToken,
+  CurrentUser,
+  CurrentUserPayload,
+} from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequestRideDto } from './dto/request-ride.dto';
 import { RidesService } from './rides.service';
@@ -13,7 +17,8 @@ export class RidesController {
   request(
     @Body() dto: RequestRideDto,
     @CurrentUser() user: CurrentUserPayload,
+    @CurrentAccessToken() accessToken: string,
   ) {
-    return this.ridesService.request(dto, user);
+    return this.ridesService.request(dto, user, accessToken);
   }
 }
