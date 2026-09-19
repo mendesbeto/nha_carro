@@ -34,33 +34,40 @@ export class RidesService {
     accessToken: string,
   ) {
     if (user.role !== 'driver') {
-      throw new ForbiddenException('Apenas motoristas podem consultar viagens disponíveis.');
+      throw new ForbiddenException(
+        'Apenas motoristas podem consultar viagens disponíveis.',
+      );
     }
 
     const client = this.supabase.getUserClient(accessToken);
     const result = await client
       .from('corridas')
-      .select('id, passageiro_id, origem_coords, destino_coords, valor_total, forma_pagamento, status, criado_em')
+      .select(
+        'id, passageiro_id, origem_coords, destino_coords, valor_total, forma_pagamento, status, criado_em',
+      )
       .eq('status', 'SOLICITADA')
       .is('motorista_id', null)
       .order('criado_em', { ascending: true });
 
     if (result.error) {
       throw new BadRequestException(
-        result.error.message ?? 'Não foi possível carregar as viagens disponíveis.',
+        result.error.message ??
+            'Não foi possível carregar as viagens disponíveis.',
       );
     }
 
-    return (result.data ?? []).map((ride) => ({
-      rideId: ride.id,
-      passageiroId: ride.passageiro_id,
-      origem: ride.origem_coords,
-      destino: ride.destino_coords,
-      valor: ride.valor_total,
-      formaPagamento: ride.forma_pagamento,
-      status: ride.status,
-      criadoEm: ride.criado_em,
-    }));
+    return {
+      rides: (result.data ?? []).map((ride) => ({
+        rideId: ride.id,
+        passageiroId: ride.passageiro_id,
+        origem: ride.origem_coords,
+        destino: ride.destino_coords,
+        valor: ride.valor_total,
+        formaPagamento: ride.forma_pagamento,
+        status: ride.status,
+        criadoEm: ride.criado_em,
+      })),
+    };
   }
 
   async accept(
