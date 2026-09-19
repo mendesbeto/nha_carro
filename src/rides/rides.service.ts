@@ -70,6 +70,40 @@ export class RidesService {
     };
   }
 
+  async get(
+    rideId: string,
+    user: CurrentUserPayload,
+    accessToken: string,
+  ) {
+    const client = this.supabase.getUserClient(accessToken);
+    const result = await client
+      .from('corridas')
+      .select('id, passageiro_id, motorista_id, origem_coords, destino_coords, valor_total, forma_pagamento, status, criado_em')
+      .eq('id', rideId)
+      .maybeSingle();
+
+    if (result.error || !result.data) {
+      throw new BadRequestException('Corrida não encontrada.');
+    }
+
+    const ride = result.data;
+    if (ride.passageiro_id !== user.sub && ride.motorista_id !== user.sub && user.role !== 'admin') {
+      throw new ForbiddenException('Você não tem acesso a esta corrida.');
+    }
+
+    return {
+      rideId: ride.id,
+      passageiroId: ride.passageiro_id,
+      motoristaId: ride.motorista_id,
+      origem: ride.origem_coords,
+      destino: ride.destino_coords,
+      valor: ride.valor_total,
+      formaPagamento: ride.forma_pagamento,
+      status: ride.status,
+      criadoEm: ride.criado_em,
+    };
+  }
+
   async accept(
     rideId: string,
     user: CurrentUserPayload,
