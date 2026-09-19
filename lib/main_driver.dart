@@ -435,47 +435,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         style: const TextStyle(
                             color: Color(0xFF0B8F62),
                             fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _StageChip(
-                          label: 'Aceitar',
-                          enabled: currentStage == RideStage.accepted,
-                          onPressed: () =>
-                              _advanceRideStage(RideStage.accepted),
-                        ),
-                        _StageChip(
-                          label: 'Embarque',
-                          enabled: currentStage == RideStage.pickup,
-                          onPressed: () => _advanceRideStage(RideStage.pickup),
-                        ),
-                        _StageChip(
-                          label: 'Em viagem',
-                          enabled: currentStage == RideStage.inTransit,
-                          onPressed: () =>
-                              _advanceRideStage(RideStage.inTransit),
-                        ),
-                        _StageChip(
-                          label: 'Chegou',
-                          enabled: currentStage == RideStage.arrived,
-                          onPressed: () => _advanceRideStage(RideStage.arrived),
-                        ),
-                      ],
-                    ),
-                    if (currentStage == RideStage.arrived ||
-                        currentStage == RideStage.cancelled) ...[
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _clearCurrentRide,
-                          icon: const Icon(Icons.restart_alt_rounded),
-                          label: const Text('Limpar corrida'),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
