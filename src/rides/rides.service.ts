@@ -24,6 +24,132 @@ const PAYMENT_METHODS: Record<string, 'DINHEIRO' | 'ORANGE_MONEY' | 'MTN_MONEY'>
 export class RidesService {
   constructor(private readonly supabase: SupabaseService) {}
 
+
+  async accept(
+    rideId: string,
+    user: CurrentUserPayload,
+    accessToken: string,
+  ) {
+    if (user.role !== 'driver') {
+      throw new ForbiddenException('Apenas motoristas podem aceitar viagens.');
+    }
+
+    return this.transition(rideId, user, accessToken, {
+      status: 'ACEITA',
+      motorista_id: user.sub,
+    });
+  }
+
+  async start(
+    rideId: string,
+    user: CurrentUserPayload,
+    accessToken: string,
+  ) {
+    if (user.role !== 'driver') {
+      throw new ForbiddenException('Apenas motoristas podem iniciar viagens.');
+    }
+
+    return this.transition(rideId, user, accessToken, {
+      status: 'EM_ANDAMENTO',
+    });
+  }
+
+  async complete(
+    rideId: string,
+    user: CurrentUserPayload,
+    accessToken: string,
+  ) {
+    if (user.role !== 'driver') {
+      throw new ForbiddenException('Apenas motoristas podem concluir viagens.');
+    }
+
+    return this.transition(rideId, user, accessToken, {
+      status: 'CONCLUIDA',
+    });
+  }
+
+  async cancel(
+    rideId: string,
+    user: CurrentUserPayload,
+    accessToken: string,
+  ) {
+    if (user.role !== 'passenger') {
+      throw new ForbiddenException('Apenas passageiros podem cancelar viagens.');
+    }
+
+    return this.transition(rideId, user, accessToken, {
+      status: 'CANCELADA',
+    });
+  }
+
+  private async transition(
+    rideId: string,
+    user: CurrentUserPayload,
+    accessToken: string,
+    changes: {
+      status: 'ACEITA' | 'EM_ANDAMENTO' | 'CONCLUIDA' | 'CANCELADA';
+      motorista_id?: string;
+    },
+  ) {
+    const client = this.supabase.getUserClient(accessToken);
+
+    const current = await client
+      .from('corridas')
+      .select('id, passageiro_id, motorista_id, status')
+      .eq('id', rideId)
+      .maybeSingle();
+
+    if (current.error || !current.data) {
+      throw new BadRequestException('Corrida não encontrada.');
+    }
+
+    const ride = current.data;
+
+    const isPassenger = ride.passageiro_id === user.sub;
+    const isDriver = ride.motorista_id === user.sub;
+
+    if (changes.status === 'ACEITA') {
+      if (ride.status !== 'SOLICITADA' || ride.motorista_id !== null) {
+        throw new BadRequestException('Esta corrida já não está disponível.');
+      }
+    } else if (changes.status === 'CANCELADA') {
+      if (!isPassenger || !['SOLICITADA', 'ACEITA'].includes(ride.status)) {
+        throw new ForbiddenException('A corrida não pode ser cancelada por este usuário.');
+      }
+    } else {
+      if (!isDriver) {
+        throw new ForbiddenException('Motorista não autorizado para esta corrida.');
+      }
+
+      const expectedPrevious =
+        changes.status === 'EM_ANDAMENTO' ? 'ACEITA' : 'EM_ANDAMENTO';
+
+      if (ride.status !== expectedPrevious) {
+        throw new BadRequestException('Transição de estado inválida.');
+      }
+    }
+
+    const result = await client
+      .from('corridas')
+      .update(changes)
+      .eq('id', rideId)
+      .select('id, passageiro_id, motorista_id, status')
+      .single();
+
+    if (result.error || !result.data) {
+      throw new BadRequestException(
+        result.error?.message ?? 'Não foi possível atualizar a corrida.',
+      );
+    }
+
+    return {
+      rideId: result.data.id,
+      status: result.data.status,
+      passageiroId: result.data.passageiro_id,
+      motoristaId: result.data.motorista_id,
+    };
+  }
+
   async request(
     dto: RequestRideDto,
     user: CurrentUserPayload,
