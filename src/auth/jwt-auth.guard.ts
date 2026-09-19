@@ -28,16 +28,14 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      // Ask Supabase Auth to validate the access token. This avoids trusting a
-      // locally minted JWT and keeps the API token identical to the RLS token.
-      const authResult = await this.supabase.getClient().auth.getUser(token);
+      const authClient = this.supabase.getAuthClient();
+      const authResult = await authClient.auth.getUser(token);
       const authUser = authResult.data.user;
       if (authResult.error || !authUser) {
         throw new UnauthorizedException('Token inválido ou expirado.');
       }
 
-      const profile = await this.supabase
-        .getClient()
+      const profile = await authClient
         .from('usuarios')
         .select('id, tipo_perfil, status_conta')
         .eq('id', authUser.id)
