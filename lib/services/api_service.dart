@@ -204,6 +204,24 @@ class ApiService {
     return data;
   }
 
+  Future<List<Map<String, dynamic>>> getAvailableRides() async {
+    final response = await _authenticatedRequest(
+      () async => http.get(
+        Uri.parse('$_baseUrl/rides/available'),
+        headers: await _headers(authenticated: true),
+      ),
+    );
+
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(data['error'] ?? 'Não foi possível carregar as corridas disponíveis.');
+    }
+
+    final rides = data['rides'];
+    if (rides is! List) return <Map<String, dynamic>>[];
+    return rides.whereType<Map>().map((ride) => Map<String, dynamic>.from(ride)).toList();
+  }
+
   Future<Map<String, dynamic>> acceptRide(String rideId) =>
       _rideAction('/rides/$rideId/accept');
 
