@@ -27,9 +27,16 @@ export class PasswordResetService {
     );
   }
 
-  async reset(rawToken: string, password: string, passwordConfirmation: string): Promise<void> {
-    // Legacy endpoint retained temporarily for source compatibility. New recovery links use Supabase Auth access tokens.
-    return this.resetWithAccessToken(rawToken, password, passwordConfirmation);
+  async reset(
+    rawToken: string,
+    password: string,
+    passwordConfirmation: string,
+  ): Promise<void> {
+    return this.resetWithAccessToken(
+      rawToken,
+      password,
+      passwordConfirmation,
+    );
   }
 
   async resetWithAccessToken(
@@ -37,24 +44,32 @@ export class PasswordResetService {
     password: string,
     passwordConfirmation: string,
   ): Promise<void> {
-    if (!accessToken || password.length < 8 || password !== passwordConfirmation) {
+    if (
+      !accessToken ||
+      password.length < 8 ||
+      password !== passwordConfirmation
+    ) {
       throw new BadRequestException('Dados de recuperação inválidos.');
     }
 
-    const client = this.supabase.getClient();
-    const authUser = await client.auth.getUser(accessToken);
+    const authClient = this.supabase.getAuthClient();
+    const authUser = await authClient.auth.getUser(accessToken);
     if (authUser.error || !authUser.data.user) {
-      throw new BadRequestException('Sessão de recuperação inválida ou expirada.');
+      throw new BadRequestException(
+        'Sessão de recuperação inválida ou expirada.',
+      );
     }
 
-    const updated = await client.auth.admin.updateUserById(authUser.data.user.id, {
-      password,
-    });
+    const updated = await this.supabase.getClient().auth.admin.updateUserById(
+      authUser.data.user.id,
+      { password },
+    );
     if (updated.error) {
-      throw new BadRequestException('Não foi possível alterar a palavra-passe.');
+      throw new BadRequestException(
+        'Não foi possível alterar a palavra-passe.',
+      );
     }
 
-    // Revoke all refresh-token sessions after a password reset.
-    await client.auth.admin.signOut(accessToken);
+    await this.supabase.getClient().auth.admin.signOut(accessToken);
   }
 }
