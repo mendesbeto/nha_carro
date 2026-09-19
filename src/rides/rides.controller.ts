@@ -29,6 +29,16 @@ export class RidesController {
     return this.ridesService.available(user, accessToken);
   }
 
+  @Get(':rideId')
+  @UseGuards(JwtAuthGuard)
+  get(
+    @Param('rideId') rideId: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentAccessToken() accessToken: string,
+  ) {
+    return this.ridesService.get(rideId, user, accessToken);
+  }
+
   @Patch(':rideId/accept')
   @UseGuards(JwtAuthGuard)
   accept(
