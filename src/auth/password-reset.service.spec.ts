@@ -15,7 +15,7 @@ describe('PasswordResetService', () => {
 
   it('rejects mismatched passwords before touching Supabase Auth', async () => {
     const getUser = jest.fn();
-    const service = new PasswordResetService({ getClient: () => ({ auth: { getUser } }) } as never, { sendSupabasePasswordResetEmail: jest.fn() } as never);
+    const service = new PasswordResetService({ getAuthClient: () => ({ auth: { getUser } }) } as never, { sendSupabasePasswordResetEmail: jest.fn() } as never);
     await expect(service.reset('token', 'newPassword1', 'differentPassword1')).rejects.toBeInstanceOf(BadRequestException);
     expect(getUser).not.toHaveBeenCalled();
   });
@@ -24,7 +24,10 @@ describe('PasswordResetService', () => {
     const getUser = jest.fn().mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
     const updateUserById = jest.fn().mockResolvedValue({ error: null });
     const signOut = jest.fn().mockResolvedValue({ error: null });
-    const service = new PasswordResetService({ getClient: () => ({ auth: { getUser, admin: { updateUserById, signOut } } }) } as never, { sendSupabasePasswordResetEmail: jest.fn() } as never);
+    const service = new PasswordResetService({
+      getAuthClient: () => ({ auth: { getUser } }),
+      getClient: () => ({ auth: { admin: { updateUserById, signOut } } }),
+    } as never, { sendSupabasePasswordResetEmail: jest.fn() } as never);
     await service.reset('recovery-access-token', 'newPassword1', 'newPassword1');
     expect(getUser).toHaveBeenCalledWith('recovery-access-token');
     expect(updateUserById).toHaveBeenCalledWith('user-1', { password: 'newPassword1' });
