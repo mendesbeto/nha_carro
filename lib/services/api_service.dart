@@ -189,6 +189,30 @@ class ApiService {
     return data;
   }
 
+  Future<Map<String, dynamic>> acceptRide(String rideId) =>
+      _authenticatedRequest(
+        'PATCH',
+        '/rides/$rideId/accept',
+      );
+
+  Future<Map<String, dynamic>> startRide(String rideId) =>
+      _authenticatedRequest(
+        'PATCH',
+        '/rides/$rideId/start',
+      );
+
+  Future<Map<String, dynamic>> completeRide(String rideId) =>
+      _authenticatedRequest(
+        'PATCH',
+        '/rides/$rideId/complete',
+      );
+
+  Future<Map<String, dynamic>> cancelRide(String rideId) =>
+      _authenticatedRequest(
+        'PATCH',
+        '/rides/$rideId/cancel',
+      );
+
   Future<RideRequest> requestRide({
     required String destination,
     required RideCategory category,
