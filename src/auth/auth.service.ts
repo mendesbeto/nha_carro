@@ -43,8 +43,6 @@ export class AuthService {
     const name = dto.name.trim();
     const client = this.supabase.getClient();
 
-    // Supabase Auth is the sole password store. Never write passwords or
-    // password hashes to public.auth_credentials.
     const created = await client.auth.admin.createUser({
       email,
       password: dto.password,
@@ -91,14 +89,14 @@ export class AuthService {
       throw error;
     }
 
-    // Return a normal Supabase Auth session so the same JWT can be used by
-    // Supabase RLS and by the NestJS API.
-    const signedIn = await client.auth.signInWithPassword({ email, password: dto.password });
+    const signedIn = await this.supabase
+      .getAuthClient()
+      .auth.signInWithPassword({ email, password: dto.password });
+
     if (signedIn.error || !signedIn.data.session) {
-      // The account exists; the client can retry login. Do not expose the
-      // service-role credential or manufacture a second JWT here.
       throw new InternalServerErrorException(
-        signedIn.error?.message ?? 'Conta criada, mas não foi possível iniciar a sessão.',
+        signedIn.error?.message ??
+          'Conta criada, mas não foi possível iniciar a sessão.',
       );
     }
 
@@ -106,10 +104,10 @@ export class AuthService {
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {
+    const authClient = this.supabase.getAuthClient();
     const email = dto.email.trim().toLowerCase();
-    const client = this.supabase.getClient();
 
-    const signedIn = await client.auth.signInWithPassword({
+    const signedIn = await authClient.auth.signInWithPassword({
       email,
       password: dto.password,
     });
@@ -118,7 +116,7 @@ export class AuthService {
       throw new UnauthorizedException('Credenciais inválidas.');
     }
 
-    const profile = await client
+    const profile = await authClient
       .from('usuarios')
       .select('id, nome, telefone, tipo_perfil, status_conta')
       .eq('id', signedIn.data.user.id)
@@ -128,16 +126,22 @@ export class AuthService {
       throw new UnauthorizedException('Perfil de usuário não encontrado.');
     }
     if (profile.data.status_conta === 'BLOQUEADO') {
-      await client.auth.admin.signOut(signedIn.data.session.access_token);
+      await this.supabase
+        .getClient()
+        .auth.admin.signOut(signedIn.data.session.access_token);
       throw new UnauthorizedException('Esta conta está bloqueada.');
     }
 
-    return this.toAuthResponse(profile.data, signedIn.data.user.email ?? email, signedIn.data.session);
+    return this.toAuthResponse(
+      profile.data,
+      signedIn.data.user.email ?? email,
+      signedIn.data.session,
+    );
   }
 
   async refresh(rawRefreshToken: string): Promise<AuthResponse> {
-    const client = this.supabase.getClient();
-    const refreshed = await client.auth.refreshSession({
+    const authClient = this.supabase.getAuthClient();
+    const refreshed = await authClient.auth.refreshSession({
       refresh_token: rawRefreshToken,
     });
 
@@ -145,7 +149,7 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token inválido, expirado ou revogado.');
     }
 
-    const profile = await client
+    const profile = await authClient
       .from('usuarios')
       .select('id, nome, telefone, tipo_perfil, status_conta')
       .eq('id', refreshed.data.user.id)
@@ -163,8 +167,8 @@ export class AuthService {
   }
 
   async logout(rawRefreshToken: string): Promise<void> {
-    const client = this.supabase.getClient();
-    const refreshed = await client.auth.refreshSession({
+    const authClient = this.supabase.getAuthClient();
+    const refreshed = await authClient.auth.refreshSession({
       refresh_token: rawRefreshToken,
     });
 
@@ -172,7 +176,9 @@ export class AuthService {
       return;
     }
 
-    await client.auth.admin.signOut(refreshed.data.session.access_token);
+    await this.supabase
+      .getClient()
+      .auth.admin.signOut(refreshed.data.session.access_token);
   }
 
   async getUserFromToken(payload: { sub: string; email: string; role: PublicUser['role'] }) {
@@ -208,7 +214,9 @@ export class AuthService {
     });
 
     if (result.error) {
-      throw new InternalServerErrorException('Não foi possível cadastrar o veículo.');
+      throw new InternalServerErrorException(
+        'Não foi possível cadastrar o veículo.',
+      );
     }
   }
 
