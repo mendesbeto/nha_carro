@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
-import 'services/ride_lifecycle_service.dart';
 
 void main() {
   runApp(const NhaCarroDriverApp());
@@ -67,30 +66,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   String get _activeRideStatus {
-    final stage = RideLifecycleService.instance.currentStage;
-    switch (stage) {
-      case RideStage.accepted:
+    switch (_activeRide?['status']?.toString()) {
+      case 'ACEITA':
         return 'Corrida aceita';
-      case RideStage.pickup:
-        return 'A recolher passageiro';
-      case RideStage.inTransit:
+      case 'EM_ANDAMENTO':
         return 'Em viagem';
-      case RideStage.arrived:
-        return 'Chegou ao destino';
-      case RideStage.cancelled:
+      case 'CONCLUIDA':
+        return 'Corrida concluída';
+      case 'CANCELADA':
         return 'Corrida cancelada';
-      case RideStage.requested:
+      default:
         return 'Sem corrida ativa';
-    }
-  }
-
-  Future<void> _toggleOnline(bool value) async {
-    setState(() => _online = value);
-    await _authService.saveDriverAvailability(value);
-    if (value) {
-      await _loadAvailableRides();
-    } else if (mounted) {
-      setState(() => _incomingRides = []);
     }
   }
 
@@ -235,7 +221,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final activeRide = _activeRide;
-    final currentStage = RideLifecycleService.instance.currentStage;
 
     return Scaffold(
       appBar: AppBar(
@@ -405,6 +390,50 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ),
           if (activeRide != null) ...[
             const SizedBox(height: 20),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Corrida ativa',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 8),
+                    Text('ID: ${activeRide['rideId'] ?? '—'}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 8),
+                    Text('Estado: $_activeRideStatus',
+                        style: const TextStyle(
+                            color: Color(0xFF0B8F62),
+                            fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 14),
+                    if (activeRide['status'] == 'ACEITA')
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _startRide,
+                          icon: const Icon(Icons.play_arrow_rounded),
+                          label: const Text('Iniciar viagem'),
+                        ),
+                      ),
+                    if (activeRide['status'] == 'EM_ANDAMENTO')
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _completeRide,
+                          icon: const Icon(Icons.flag_rounded),
+                          label: const Text('Concluir viagem'),
+                        ),
+                      ),
+                    if (activeRide['status'] == 'CONCLUIDA')
+                      const Text('A corrida foi concluída no servidor.',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
