@@ -259,6 +259,7 @@ class ApiService {
         orElse: () => paymentMethod,
       ),
       estimatedFare: data['estimatedFare'] as int? ?? _fareFor(category),
+      rideId: data['rideId'] as String?,
     );
   }
 
