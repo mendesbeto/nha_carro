@@ -296,8 +296,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ],
           ),
           const SizedBox(height: 18),
-          const Card(
-            color: Color(0xFFE0F5EA),
+          Card(
+            color: const Color(0xFFE0F5EA),
             child: ListTile(
               leading: Icon(Icons.account_balance_wallet_outlined),
               title: Text('Saldo da carteira'),
