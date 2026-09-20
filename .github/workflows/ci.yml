@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Security audit (diagnostic)
+        run: npm audit --audit-level=high || true
+
       - name: Test
         run: npm test
 
