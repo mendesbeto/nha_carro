@@ -26,6 +26,9 @@
     "rxjs": "^7.8.2",
     "helmet": "^8.1.0"
   },
+  "overrides": {
+    "multer": "2.3.0"
+  },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
     "@types/node": "^22.0.0",
