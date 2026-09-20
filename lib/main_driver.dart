@@ -379,6 +379,49 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
             ),
           ),
+          if (activeRide != null) ...[
+            const SizedBox(height: 20),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Corrida ativa',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 8),
+                    Text('ID: ${activeRide['rideId'] ?? '—'}'),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Estado: $_activeRideStatus',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 12),
+                    if (activeRide['status'] == 'ACEITA')
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: _startRide,
+                          child: const Text('Iniciar viagem'),
+                        ),
+                      ),
+                    if (activeRide['status'] == 'EM_ANDAMENTO')
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: _completeRide,
+                          child: const Text('Concluir viagem'),
+                        ),
+                      ),
+                    if (activeRide['status'] == 'CONCLUIDA')
+                      const Text('Corrida concluída no servidor.'),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           const Text(
             'Corridas disponíveis',
