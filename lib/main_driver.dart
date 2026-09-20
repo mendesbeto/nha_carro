@@ -347,7 +347,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: const _QuickActionButton(
+                        child: _QuickActionButton(
                           icon: Icons.route_outlined,
                           label: 'Ver rota',
                           onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
