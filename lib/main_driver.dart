@@ -39,6 +39,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Map<String, dynamic>? _activeRide;
   bool _loadingRides = false;
   bool _online = false;
+  String _walletBalance = '—';
 
   final List<Map<String, dynamic>> _recentTrips = [
     {
@@ -61,6 +62,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       final savedStatus = await _authService.loadDriverAvailability();
       if (!mounted) return;
       setState(() => _online = savedStatus);
+      await _loadWallet();
       if (savedStatus) await _loadAvailableRides();
     });
   }
@@ -88,6 +90,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       if (!value) _incomingRides = [];
     });
     if (value) await _loadAvailableRides();
+  }
+
+  Future<void> _loadWallet() async {
+    try {
+      final wallet = await _api.getWallet();
+      if (!mounted) return;
+      final balance = wallet['balance'];
+      setState(() => _walletBalance = balance == null ? '—' : '${balance} CFA');
+    } catch (_) {
+      // Keep the wallet unavailable rather than showing fabricated financial data.
+    }
   }
 
   Future<void> _loadAvailableRides() async {
@@ -180,9 +193,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   void _showNotifications() {
     const notifications = [
-      'Nova corrida disponível perto de Bandim.',
-      'Aisha P. confirmou o ponto de encontro.',
-      'Você ganhou 150 CFA de bonificação hoje.',
+      'Novas corridas podem aparecer enquanto você estiver online.',
+      'As atualizações da corrida são sincronizadas com o servidor.',
     ];
 
     showDialog<void>(
@@ -269,7 +281,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               Expanded(
                 child: _SummaryCard(
                   title: 'Hoje',
-                  value: '1.250 CFA',
+                  value: '—',
                   icon: Icons.account_balance_wallet_rounded,
                 ),
               ),
@@ -277,7 +289,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               Expanded(
                 child: _SummaryCard(
                   title: 'Viagens',
-                  value: '4',
+                  value: '—',
                   icon: Icons.local_taxi_rounded,
                 ),
               ),
@@ -291,7 +303,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               title: Text('Saldo da carteira'),
               subtitle: Text('Carteira NhaCarro'),
               trailing: Text(
-                '5.000 CFA',
+                _walletBalance,
                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
               ),
             ),
@@ -331,13 +343,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       Expanded(
                         child: _MiniStat(
                             label: 'Tempo médio',
-                            value: _online ? '11 min' : '—'),
+                            value: '—'),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: _MiniStat(
                             label: 'Receita',
-                            value: _online ? '1.250 CFA' : '0 CFA'),
+                            value: '—'),
                       ),
                     ],
                   ),
@@ -354,11 +366,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         child: _QuickActionButton(
                           icon: Icons.route_outlined,
                           label: 'Ver rota',
-                          onPressed: () =>
-                              ScaffoldMessenger.of(context).showSnackBar(
+                          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                                content: Text(
-                                    'Rota para Bandim aberta no painel do motorista.')),
+                                content: Text('A rota detalhada será exibida quando a localização do motorista estiver disponível.')),
                           ),
                         ),
                       ),
