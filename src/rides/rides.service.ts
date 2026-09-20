@@ -163,7 +163,7 @@ export class RidesService {
     user: CurrentUserPayload,
     accessToken: string,
     changes: {
-      status: 'ACEITA' | 'EM_ANDAMENTO' | 'CONCLUIDA' | 'CANCELADA';
+      status: 'ACEITA' | 'EM_ANDAMENTO' | 'CANCELADA';
       motorista_id?: string;
     },
   ) {
