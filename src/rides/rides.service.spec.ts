@@ -7,7 +7,7 @@ function queryChain(result: unknown) {
   c.eq = jest.fn(() => c);
   c.is = jest.fn(() => c);
   c.in = jest.fn(() => c);
-  c.order = jest.fn(() => c);
+  c.order = jest.fn().mockResolvedValue(result);
   c.maybeSingle = jest.fn().mockResolvedValue(result);
   c.single = jest.fn().mockResolvedValue(result);
   c.insert = jest.fn(() => c);
@@ -60,11 +60,7 @@ describe('RidesService', () => {
       data: { id: 'ride-1', passageiro_id: 'passenger-1', motorista_id: 'driver-1', status: 'ACEITA' },
       error: null,
     });
-    const client = {
-      from: jest.fn()
-        .mockReturnValueOnce(current)
-        .mockReturnValueOnce(update),
-    };
+    const client = { from: jest.fn().mockReturnValueOnce(current).mockReturnValueOnce(update) };
     supabase.getUserClient.mockReturnValue(client);
 
     const result = await service.accept('ride-1', driver, token);
@@ -80,8 +76,7 @@ describe('RidesService', () => {
       data: { id: 'ride-1', passageiro_id: 'passenger-1', motorista_id: 'driver-2', status: 'ACEITA' },
       error: null,
     });
-    const client = { from: jest.fn().mockReturnValue(current) };
-    supabase.getUserClient.mockReturnValue(client);
+    supabase.getUserClient.mockReturnValue({ from: jest.fn().mockReturnValue(current) });
 
     await expect(service.accept('ride-1', driver, token)).rejects.toBeInstanceOf(BadRequestException);
     expect(current.update).not.toHaveBeenCalled();
@@ -93,8 +88,7 @@ describe('RidesService', () => {
       error: null,
     });
     const update = queryChain({ data: null, error: { message: '0 rows returned' } });
-    const client = { from: jest.fn().mockReturnValueOnce(current).mockReturnValueOnce(update) };
-    supabase.getUserClient.mockReturnValue(client);
+    supabase.getUserClient.mockReturnValue({ from: jest.fn().mockReturnValueOnce(current).mockReturnValueOnce(update) });
 
     await expect(service.start('ride-1', driver, token)).rejects.toBeInstanceOf(BadRequestException);
     expect(update.update).toHaveBeenCalledWith({ status: 'EM_ANDAMENTO' });
@@ -111,9 +105,7 @@ describe('RidesService', () => {
       data: { id: 'ride-1', passageiro_id: 'passenger-1', motorista_id: null, status: 'CANCELADA' },
       error: null,
     });
-    supabase.getUserClient.mockReturnValue({
-      from: jest.fn().mockReturnValueOnce(current).mockReturnValueOnce(update),
-    });
+    supabase.getUserClient.mockReturnValue({ from: jest.fn().mockReturnValueOnce(current).mockReturnValueOnce(update) });
 
     await service.cancel('ride-1', passenger, token);
 
@@ -129,9 +121,7 @@ describe('RidesService', () => {
   it('persists a ride with server-side fare, commission and payment mapping', async () => {
     const profile = queryChain({ data: { id: 'passenger-1' }, error: null });
     const insert = queryChain({ data: { id: 'ride-1' }, error: null });
-    supabase.getUserClient.mockReturnValue({
-      from: jest.fn().mockReturnValueOnce(profile).mockReturnValueOnce(insert),
-    });
+    supabase.getUserClient.mockReturnValue({ from: jest.fn().mockReturnValueOnce(profile).mockReturnValueOnce(insert) });
 
     const result = await service.request({
       destination: 'Centro',
