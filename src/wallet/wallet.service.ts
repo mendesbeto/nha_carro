@@ -71,6 +71,10 @@ export class WalletService {
       balance: settlement.balance,
       transactionId: settlement.transaction_id,
       reason: settlement.reason,
+      commission: settlement.commission,
+      driverCredit: settlement.driver_credit,
+      driverBalance: settlement.driver_balance,
+      driverTransactionId: settlement.driver_transaction_id,
     };
   }
 }
