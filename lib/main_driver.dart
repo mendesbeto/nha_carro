@@ -263,7 +263,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           Row(
             children: [
               Expanded(
-                child: _SummaryCard(
+                child: const _SummaryCard(
                   title: 'Hoje',
                   value: '—',
                   icon: Icons.account_balance_wallet_rounded,
@@ -271,7 +271,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _SummaryCard(
+                child: const _SummaryCard(
                   title: 'Viagens',
                   value: '—',
                   icon: Icons.local_taxi_rounded,
@@ -347,7 +347,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: _QuickActionButton(
+                        child: const _QuickActionButton(
                           icon: Icons.route_outlined,
                           label: 'Ver rota',
                           onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
