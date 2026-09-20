@@ -218,7 +218,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
               const SizedBox(height: 14),
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(
+                child: const LinearProgressIndicator(
                   minHeight: 6,
                 ),
               ),
