@@ -37,23 +37,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   final ApiService _api = ApiService();
   List<Map<String, dynamic>> _incomingRides = [];
   Map<String, dynamic>? _activeRide;
-  bool _loadingRides = false;
   bool _online = false;
   String _walletBalance = '—';
 
-  final List<Map<String, dynamic>> _recentTrips = [
-    {
-      'route': 'Aeroporto → Bandim',
-      'time': 'Hoje • 14:20',
-      'amount': '3.500 CFA'
-    },
-    {
-      'route': 'Mercado → Praia',
-      'time': 'Ontem • 18:45',
-      'amount': '2.800 CFA'
-    },
-    {'route': 'Centro → Casa', 'time': 'Seg • 08:10', 'amount': '1.900 CFA'},
-  ];
+
 
   @override
   void initState() {
@@ -97,7 +84,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       final wallet = await _api.getWallet();
       if (!mounted) return;
       final balance = wallet['balance'];
-      setState(() => _walletBalance = balance == null ? '—' : '${balance} CFA');
+      setState(() => _walletBalance = balance == null ? '—' : '$balance CFA');
     } catch (_) {
       // Keep the wallet unavailable rather than showing fabricated financial data.
     }
@@ -105,7 +92,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> _loadAvailableRides() async {
     if (!_online) return;
-    setState(() => _loadingRides = true);
     try {
       final rides = await _api.getAvailableRides();
       if (!mounted) return;
@@ -115,9 +101,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
       );
-    } finally {
-      if (mounted) setState(() => _loadingRides = false);
-    }
   }
 
   Future<void> _acceptRide(Map<String, dynamic> ride) async {
@@ -276,7 +259,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          const Row(
+          Row(
             children: [
               Expanded(
                 child: _SummaryCard(
@@ -285,7 +268,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   icon: Icons.account_balance_wallet_rounded,
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: _SummaryCard(
                   title: 'Viagens',
@@ -299,12 +282,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           Card(
             color: const Color(0xFFE0F5EA),
             child: ListTile(
-              leading: Icon(Icons.account_balance_wallet_outlined),
-              title: Text('Saldo da carteira'),
-              subtitle: Text('Carteira NhaCarro'),
+              leading: const Icon(Icons.account_balance_wallet_outlined),
+              title: const Text('Saldo da carteira'),
+              subtitle: const Text('Carteira NhaCarro'),
               trailing: Text(
                 _walletBalance,
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
               ),
             ),
           ),
@@ -341,13 +324,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: _MiniStat(
+                        child: const _MiniStat(
                             label: 'Tempo médio',
                             value: '—'),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: _MiniStat(
+                        child: const _MiniStat(
                             label: 'Receita',
                             value: '—'),
                       ),
