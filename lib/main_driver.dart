@@ -101,6 +101,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
       );
+    }
   }
 
   Future<void> _acceptRide(Map<String, dynamic> ride) async {
