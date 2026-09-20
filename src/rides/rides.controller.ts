@@ -1,5 +1,17 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
-import { CurrentUser, CurrentUserPayload } from '../auth/current-user.decorator';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  CurrentAccessToken,
+  CurrentUser,
+  CurrentUserPayload,
+} from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequestRideDto } from './dto/request-ride.dto';
 import { RidesService } from './rides.service';
@@ -8,12 +20,71 @@ import { RidesService } from './rides.service';
 export class RidesController {
   constructor(private readonly ridesService: RidesService) {}
 
+  @Get('available')
+  @UseGuards(JwtAuthGuard)
+  available(
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentAccessToken() accessToken: string,
+  ) {
+    return this.ridesService.available(user, accessToken);
+  }
+
+  @Get(':rideId')
+  @UseGuards(JwtAuthGuard)
+  get(
+    @Param('rideId') rideId: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentAccessToken() accessToken: string,
+  ) {
+    return this.ridesService.get(rideId, user, accessToken);
+  }
+
+  @Patch(':rideId/accept')
+  @UseGuards(JwtAuthGuard)
+  accept(
+    @Param('rideId') rideId: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentAccessToken() accessToken: string,
+  ) {
+    return this.ridesService.accept(rideId, user, accessToken);
+  }
+
+  @Patch(':rideId/start')
+  @UseGuards(JwtAuthGuard)
+  start(
+    @Param('rideId') rideId: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentAccessToken() accessToken: string,
+  ) {
+    return this.ridesService.start(rideId, user, accessToken);
+  }
+
+  @Patch(':rideId/complete')
+  @UseGuards(JwtAuthGuard)
+  complete(
+    @Param('rideId') rideId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.ridesService.complete(rideId, user);
+  }
+
+  @Patch(':rideId/cancel')
+  @UseGuards(JwtAuthGuard)
+  cancel(
+    @Param('rideId') rideId: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentAccessToken() accessToken: string,
+  ) {
+    return this.ridesService.cancel(rideId, user, accessToken);
+  }
+
   @Post('request')
   @UseGuards(JwtAuthGuard)
   request(
     @Body() dto: RequestRideDto,
     @CurrentUser() user: CurrentUserPayload,
+    @CurrentAccessToken() accessToken: string,
   ) {
-    return this.ridesService.request(dto, user);
+    return this.ridesService.request(dto, user, accessToken);
   }
 }

@@ -18,25 +18,47 @@ export class PasswordResetPageController {
   @Header('Content-Type', 'text/html; charset=utf-8')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   page(@Query('token') token?: string): string {
-    if (!token) {
+    if (token) {
       return this.renderPage(
-        'Link inválido',
-        '<p>O link de recuperação está incompleto ou inválido.</p>',
+        'Redefinir palavra-passe',
+        `<form method="post" action="/reset-password">
+          <input type="hidden" name="token" value="${this.escape(token)}">
+          ${this.formFields()}
+        </form>`,
       );
     }
 
     return this.renderPage(
       'Redefinir palavra-passe',
-      `<form method="post" action="/reset-password">
-        <input type="hidden" name="token" value="${this.escape(token)}">
-        <label for="password">Nova palavra-passe</label>
-        <input id="password" name="password" type="password" minlength="8" maxlength="128" required autocomplete="new-password">
-        <label for="passwordConfirmation">Confirmar palavra-passe</label>
-        <input id="passwordConfirmation" name="passwordConfirmation" type="password" minlength="8" maxlength="128" required autocomplete="new-password">
-        <button type="submit">Alterar palavra-passe</button>
-      </form>
-      <p>A palavra-passe deve ter pelo menos 8 caracteres. O link expira em 30 minutos e só pode ser usado uma vez.</p>`,
+      `<div id="recovery-form">
+        <p>Defina uma nova palavra-passe para a sua conta NhaCarro.</p>
+        <form method="post" action="/reset-password" id="password-reset-form">
+          <input type="hidden" name="token" id="recovery-token">
+          ${this.formFields()}
+        </form>
+      </div>
+      <script src="/reset-password/recovery.js" defer></script>`,
     );
+  }
+
+  @Get('recovery.js')
+  @Header('Content-Type', 'application/javascript; charset=utf-8')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  recoveryScript(): string {
+    return `(() => {
+  const form = document.getElementById('password-reset-form');
+  const tokenInput = document.getElementById('recovery-token');
+  const hash = window.location.hash.replace(/^#/, '');
+  const params = new URLSearchParams(hash);
+  const accessToken = params.get('access_token');
+  if (!form || !tokenInput || !accessToken) {
+    const box = document.getElementById('recovery-form');
+    if (box) box.innerHTML = '<p>O link de recuperação está incompleto, inválido ou expirou.</p>';
+    return;
+  }
+  tokenInput.value = accessToken;
+  window.history.replaceState({}, document.title, window.location.pathname);
+})();`;
   }
 
   @Post()
@@ -59,14 +81,14 @@ export class PasswordResetPageController {
     }
 
     try {
-      await this.passwordResetService.reset(
+      await this.passwordResetService.resetWithAccessToken(
         body.token,
         body.password,
         body.passwordConfirmation,
       );
       return this.renderPage(
         'Palavra-passe alterada',
-        '<p>A sua palavra-passe foi alterada com sucesso. Por segurança, as sessões anteriores foram encerradas.</p><p>Já pode voltar à aplicação e iniciar sessão.</p>',
+        '<p>A sua palavra-passe foi alterada com sucesso.</p><p>Já pode voltar à aplicação e iniciar sessão.</p>',
       );
     } catch (_) {
       return this.renderPage(
@@ -74,6 +96,15 @@ export class PasswordResetPageController {
         '<p>O link de recuperação é inválido, expirou ou já foi utilizado.</p>',
       );
     }
+  }
+
+  private formFields(): string {
+    return `<label for="password">Nova palavra-passe</label>
+    <input id="password" name="password" type="password" minlength="8" maxlength="128" required autocomplete="new-password">
+    <label for="passwordConfirmation">Confirmar palavra-passe</label>
+    <input id="passwordConfirmation" name="passwordConfirmation" type="password" minlength="8" maxlength="128" required autocomplete="new-password">
+    <button type="submit">Alterar palavra-passe</button>
+    <p>A palavra-passe deve ter pelo menos 8 caracteres.</p>`;
   }
 
   private renderPage(title: string, content: string): string {

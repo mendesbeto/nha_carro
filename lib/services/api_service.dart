@@ -26,6 +26,7 @@ class ApiService {
     required String name,
     required String email,
     required String password,
+    required String telefone,
     required String role,
     String? vehicle,
     String? plate,
@@ -36,6 +37,7 @@ class ApiService {
       body: jsonEncode({
         'name': name,
         'email': email,
+        'telefone': telefone,
         'password': password,
         'role': role,
         'vehicle': vehicle,
@@ -172,6 +174,21 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> getWallet() async {
+    final response = await _authenticatedRequest(
+      () async => http.get(
+        Uri.parse('$_baseUrl/wallet'),
+        headers: await _headers(authenticated: true),
+      ),
+    );
+
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(data['error'] ?? 'Não foi possível carregar a carteira.');
+    }
+    return data;
+  }
+
   Future<Map<String, dynamic>> me() async {
     final response = await _authenticatedRequest(
       () async => http.get(
@@ -187,10 +204,73 @@ class ApiService {
     return data;
   }
 
+  Future<List<Map<String, dynamic>>> getAvailableRides() async {
+    final response = await _authenticatedRequest(
+      () async => http.get(
+        Uri.parse('$_baseUrl/rides/available'),
+        headers: await _headers(authenticated: true),
+      ),
+    );
+
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(data['error'] ?? 'Não foi possível carregar as corridas disponíveis.');
+    }
+
+    final rides = data['rides'];
+    if (rides is! List) return <Map<String, dynamic>>[];
+    return rides.whereType<Map>().map((ride) => Map<String, dynamic>.from(ride)).toList();
+  }
+
+  Future<Map<String, dynamic>> getRide(String rideId) async {
+    final response = await _authenticatedRequest(
+      () async => http.get(
+        Uri.parse('$_baseUrl/rides/$rideId'),
+        headers: await _headers(authenticated: true),
+      ),
+    );
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(data['error'] ?? 'Não foi possível carregar a corrida.');
+    }
+    return data;
+  }
+
+  Future<Map<String, dynamic>> acceptRide(String rideId) =>
+      _rideAction('/rides/$rideId/accept');
+
+  Future<Map<String, dynamic>> startRide(String rideId) =>
+      _rideAction('/rides/$rideId/start');
+
+  Future<Map<String, dynamic>> completeRide(String rideId) =>
+      _rideAction('/rides/$rideId/complete');
+
+  Future<Map<String, dynamic>> cancelRide(String rideId) =>
+      _rideAction('/rides/$rideId/cancel');
+
+  Future<Map<String, dynamic>> _rideAction(String path) async {
+    final response = await _authenticatedRequest(
+      () async => http.patch(
+        Uri.parse('$_baseUrl$path'),
+        headers: await _headers(authenticated: true),
+      ),
+    );
+
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(data['error'] ?? 'Não foi possível atualizar a corrida.');
+    }
+    return data;
+  }
+
   Future<RideRequest> requestRide({
     required String destination,
     required RideCategory category,
     required PaymentMethod paymentMethod,
+    required double originLat,
+    required double originLng,
+    double? destinationLat,
+    double? destinationLng,
   }) async {
     final response = await _authenticatedRequest(
       () async => http.post(
@@ -200,6 +280,10 @@ class ApiService {
           'destination': destination,
           'category': category.name,
           'paymentMethod': paymentMethod.name,
+          'originLat': originLat,
+          'originLng': originLng,
+          if (destinationLat != null) 'destinationLat': destinationLat,
+          if (destinationLng != null) 'destinationLng': destinationLng,
         }),
       ),
     );
@@ -222,6 +306,7 @@ class ApiService {
         orElse: () => paymentMethod,
       ),
       estimatedFare: data['estimatedFare'] as int? ?? _fareFor(category),
+      rideId: data['rideId'] as String?,
     );
   }
 

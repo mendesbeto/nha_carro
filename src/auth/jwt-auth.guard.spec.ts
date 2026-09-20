@@ -8,30 +8,34 @@ describe('JwtAuthGuard', () => {
   }
 
   it('rejects requests without a Bearer token', async () => {
-    const guard = new JwtAuthGuard({ verifyAsync: jest.fn() } as never, {} as never);
+    const guard = new JwtAuthGuard({ getAuthClient: jest.fn() } as never);
     await expect(guard.canActivate(context())).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
-  it('rejects a token when the server-side session version changed', async () => {
-    const verifyAsync = jest.fn().mockResolvedValue({ sub: 'user-1', email: 'beto@example.com', role: 'passenger', sv: 0 });
-    const from = jest.fn(() => ({
-      select: jest.fn(() => ({ eq: jest.fn(() => ({ maybeSingle: jest.fn().mockResolvedValue({ data: { id: 'user-1', tipo_perfil: 'PASSAGEIRO', status_conta: 'ATIVO', session_version: 1 }, error: null }) })) })),
-    }));
-    const guard = new JwtAuthGuard({ verifyAsync } as never, { getClient: () => ({ from }) } as never);
-
+  it('rejects an invalid Supabase access token', async () => {
+    const guard = new JwtAuthGuard({ getAuthClient: () => ({ auth: { getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: { message: 'Invalid token' } }) } }) } as never);
     await expect(guard.canActivate(context('Bearer token'))).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
-  it('accepts a valid token and refreshes the role from the database', async () => {
+  it('accepts a valid token and loads the current role from the RLS-bound client', async () => {
     const requestContext = context('Bearer token');
     const request = (requestContext as any).switchToHttp().getRequest();
-    const verifyAsync = jest.fn().mockResolvedValue({ sub: 'user-1', email: 'beto@example.com', role: 'passenger', sv: 2 });
-    const from = jest.fn(() => ({
-      select: jest.fn(() => ({ eq: jest.fn(() => ({ maybeSingle: jest.fn().mockResolvedValue({ data: { id: 'user-1', tipo_perfil: 'MOTORISTA', status_conta: 'ATIVO', session_version: 2 }, error: null }) })) })),
-    }));
-    const guard = new JwtAuthGuard({ verifyAsync } as never, { getClient: () => ({ from }) } as never);
+    const from = jest.fn(() => ({ select: jest.fn(() => ({ eq: jest.fn(() => ({ maybeSingle: jest.fn().mockResolvedValue({ data: { id: 'user-1', tipo_perfil: 'MOTORISTA', status_conta: 'ATIVO' }, error: null }) })) })) }));
+    const guard = new JwtAuthGuard({
+      getAuthClient: () => ({ auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'user-1', email: 'beto@example.com' } }, error: null }) } }),
+      getUserClient: jest.fn(() => ({ from })),
+    } as never);
 
     await expect(guard.canActivate(requestContext)).resolves.toBe(true);
-    expect(request.user).toMatchObject({ sub: 'user-1', role: 'driver', sv: 2 });
+    expect(request.user).toMatchObject({ sub: 'user-1', email: 'beto@example.com', role: 'driver' });
+    expect((guard as any).supabase.getUserClient).toHaveBeenCalledWith('token');
+  });
+
+  it('rejects a blocked account', async () => {
+    const guard = new JwtAuthGuard({
+      getAuthClient: () => ({ auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'user-1', email: 'beto@example.com' } }, error: null }) } }),
+      getUserClient: jest.fn(() => ({ from: jest.fn(() => ({ select: jest.fn(() => ({ eq: jest.fn(() => ({ maybeSingle: jest.fn().mockResolvedValue({ data: { id: 'user-1', tipo_perfil: 'PASSAGEIRO', status_conta: 'BLOQUEADO' }, error: null }) })) })) })) })),
+    } as never);
+    await expect(guard.canActivate(context('Bearer token'))).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });

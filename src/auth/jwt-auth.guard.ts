@@ -4,7 +4,6 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { SupabaseService } from '../supabase/supabase.service';
 
@@ -12,17 +11,16 @@ export type AuthenticatedUser = {
   sub: string;
   email: string;
   role: 'passenger' | 'driver' | 'admin';
-  sv: number;
 };
 
-export type AuthenticatedRequest = Request & { user: AuthenticatedUser };
+export type AuthenticatedRequest = Request & {
+  user: AuthenticatedUser;
+  accessToken: string;
+};
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(
-    private readonly jwtService: JwtService,
-    private readonly supabase: SupabaseService,
-  ) {}
+  constructor(private readonly supabase: SupabaseService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
@@ -33,22 +31,21 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const payload =
-        await this.jwtService.verifyAsync<AuthenticatedUser>(token);
+      const authClient = this.supabase.getAuthClient();
+      const authResult = await authClient.auth.getUser(token);
+      const authUser = authResult.data.user;
+      if (authResult.error || !authUser) {
+        throw new UnauthorizedException('Token inválido ou expirado.');
+      }
 
-      const result = await this.supabase
-        .getClient()
+      const userClient = this.supabase.getUserClient(token);
+      const profile = await userClient
         .from('usuarios')
-        .select('id, tipo_perfil, status_conta, session_version')
-        .eq('id', payload.sub)
+        .select('id, tipo_perfil, status_conta')
+        .eq('id', authUser.id)
         .maybeSingle();
 
-      if (
-        result.error ||
-        !result.data ||
-        result.data.status_conta === 'BLOQUEADO' ||
-        result.data.session_version !== payload.sv
-      ) {
+      if (profile.error || !profile.data || profile.data.status_conta === 'BLOQUEADO') {
         throw new UnauthorizedException('Sessão inválida.');
       }
 
@@ -57,17 +54,17 @@ export class JwtAuthGuard implements CanActivate {
         MOTORISTA: 'driver',
         ADMIN: 'admin',
       } as const;
-
-      const role = roleMap[result.data.tipo_perfil as keyof typeof roleMap];
+      const role = roleMap[profile.data.tipo_perfil as keyof typeof roleMap];
       if (!role) {
         throw new UnauthorizedException('Sessão inválida.');
       }
 
       request.user = {
-        ...payload,
+        sub: authUser.id,
+        email: authUser.email ?? '',
         role,
-        sv: result.data.session_version,
       };
+      request.accessToken = token;
       return true;
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;

@@ -236,8 +236,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           TextFormField(
                             controller: _passwordController,
                             obscureText: _obscurePassword,
-                            validator: (value) => value == null || value.length < 6
-                                ? 'A senha deve ter pelo menos 6 caracteres.'
+                            validator: (value) => value == null || value.length < 8
+                                ? 'A senha deve ter pelo menos 8 caracteres.'
                                 : null,
                             decoration: InputDecoration(
                               labelText: 'Senha',

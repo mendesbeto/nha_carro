@@ -274,6 +274,7 @@ class _RegistrationFormScreenState extends State<RegistrationFormScreen> {
       final response = await ApiService().registerUser(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
+        telefone: _phoneController.text.trim(),
         password: _passwordController.text,
         role: widget.role.name,
         vehicle: widget.role == UserRole.driver ? _vehicleController.text.trim() : null,
@@ -354,7 +355,7 @@ class _RegistrationFormScreenState extends State<RegistrationFormScreen> {
                 controller: _passwordController,
                 obscureText: _obscurePassword,
                 onToggleVisibility: () => setState(() => _obscurePassword = !_obscurePassword),
-                validator: (value) => value == null || value.length < 6 ? 'A senha deve ter pelo menos 6 caracteres.' : null,
+                validator: (value) => value == null || value.length < 8 ? 'A senha deve ter pelo menos 8 caracteres.' : null,
               ),
               const SizedBox(height: 14),
               _buildPasswordField(

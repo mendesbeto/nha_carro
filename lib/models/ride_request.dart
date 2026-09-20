@@ -17,6 +17,7 @@ class RideRequest {
     required this.category,
     required this.paymentMethod,
     required this.estimatedFare,
+    this.rideId,
   });
 
   final String origin;
@@ -24,6 +25,7 @@ class RideRequest {
   final RideCategory category;
   final PaymentMethod paymentMethod;
   final int estimatedFare;
+  final String? rideId;
 
   String get categoryLabel {
     switch (category) {

@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../models/ride_request.dart';
-import '../services/ride_lifecycle_service.dart';
-import '../services/socket_service.dart';
+import '../services/api_service.dart';
 
 class RideTrackingScreen extends StatefulWidget {
   const RideTrackingScreen({required this.ride, super.key});
@@ -17,65 +16,67 @@ class RideTrackingScreen extends StatefulWidget {
 }
 
 class _RideTrackingScreenState extends State<RideTrackingScreen> {
-  final _socket = SocketService();
-  StreamSubscription<DriverLocation>? _subscription;
-  DriverLocation _location = const DriverLocation(progress: 0, minutesAway: 6);
+  final _api = ApiService();
+  Timer? _pollTimer;
+  Map<String, dynamic>? _serverRide;
   bool _arrived = false;
   bool _cancelled = false;
   double _rating = 4.5;
 
+  String get _serverStatus => _serverRide?['status']?.toString() ?? 'SOLICITADA';
+
   String get _tripStageLabel {
-    final stage = RideLifecycleService.instance.currentRide?['stage'] as String?;
-    if (_cancelled || stage == RideStage.cancelled.name) return 'Viagem cancelada';
-    if (_arrived || stage == RideStage.arrived.name) return 'Chegou ao destino';
-    if (stage == RideStage.inTransit.name || _location.progress >= 0.75) {
-      return 'Próximo do destino';
+    switch (_serverStatus) {
+      case 'ACEITA': return 'Motorista a caminho';
+      case 'EM_ANDAMENTO': return 'Viagem em andamento';
+      case 'CONCLUIDA': return 'Chegou ao destino';
+      case 'CANCELADA': return 'Viagem cancelada';
+      default: return 'A procurar motorista';
     }
-    if (stage == RideStage.pickup.name || _location.progress >= 0.4) {
-      return 'Embarque em andamento';
-    }
-    return 'Motorista a caminho';
   }
 
   String get _tripStageSubtitle {
-    final stage = RideLifecycleService.instance.currentRide?['stage'] as String?;
-    if (_cancelled || stage == RideStage.cancelled.name) {
-      return 'A viagem foi cancelada e a devolução foi agendada.';
+    switch (_serverStatus) {
+      case 'ACEITA': return 'O motorista aceitou a viagem e está a caminho.';
+      case 'EM_ANDAMENTO': return 'A sua viagem está em andamento.';
+      case 'CONCLUIDA': return 'A viagem foi concluída pelo motorista.';
+      case 'CANCELADA': return 'A viagem foi cancelada.';
+      default: return 'A aguardar um motorista aceitar a solicitação.';
     }
-    if (_arrived || stage == RideStage.arrived.name) {
-      return 'O motorista chegou ao ponto de destino.';
-    }
-    if (stage == RideStage.inTransit.name || _location.progress >= 0.75) {
-      return 'O motorista está chegando ao ponto de encontro.';
-    }
-    if (stage == RideStage.pickup.name || _location.progress >= 0.4) {
-      return 'O motorista já saiu e segue em direção ao seu local.';
-    }
-    return 'A sua viagem foi aceita e o motorista está a caminho.';
   }
 
   @override
   void initState() {
     super.initState();
-    _socket.initSocket('ride-${widget.ride.destination.hashCode}');
-    _subscription = _socket.trackDriver().listen((location) {
-      if (!mounted) return;
-      final nextArrived = location.progress >= 1;
-      setState(() {
-        _location = location;
-        _arrived = nextArrived;
-      });
-      if (nextArrived) {
-        RideLifecycleService.instance.updateRideStage(RideStage.arrived);
-      }
+    _pollRideStatus();
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _pollRideStatus();
     });
   }
 
   @override
   void dispose() {
-    _subscription?.cancel();
-    _socket.dispose();
+    _pollTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _pollRideStatus() async {
+    final rideId = widget.ride.rideId;
+    if (rideId == null || rideId.isEmpty) return;
+    try {
+      final ride = await _api.getRide(rideId);
+      if (!mounted) return;
+      setState(() {
+        _serverRide = ride;
+        _arrived = ride['status']?.toString() == 'CONCLUIDA';
+      });
+      final status = ride['status']?.toString();
+      if (status == 'CONCLUIDA' || status == 'CANCELADA') {
+        _pollTimer?.cancel();
+      }
+    } catch (_) {
+      // Keep the last server state visible while connectivity is unavailable.
+    }
   }
 
   @override
@@ -87,7 +88,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
 
     final mapWidget = googleMapsApiKey.isEmpty
         ? Positioned.fill(
-            child: CustomPaint(painter: _TrackingMapPainter(_location.progress)),
+            child: CustomPaint(painter: _TrackingMapPainter(0.0)),
           )
         : Positioned.fill(
             child: GoogleMap(
@@ -148,7 +149,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
             Text(
               _arrived
                   ? 'O motorista chegou!'
-                  : '$_tripStageLabel · ${_location.minutesAway} min',
+                  : _tripStageLabel,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
@@ -217,8 +218,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
               const SizedBox(height: 14),
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(
-                  value: _location.progress,
+                child: const LinearProgressIndicator(
                   minHeight: 6,
                 ),
               ),
@@ -249,13 +249,37 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
                         );
 
                         if (confirmed == true && mounted) {
-                          setState(() => _cancelled = true);
-                          RideLifecycleService.instance.updateRideStage(RideStage.cancelled);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Viagem cancelada. Reembolso em processamento.'),
-                            ),
-                          );
+                          final rideId = widget.ride.rideId;
+                          if (rideId == null || rideId.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Não foi possível identificar a corrida para cancelamento.'),
+                              ),
+                            );
+                            return;
+                          }
+
+                          try {
+                            await _api.cancelRide(rideId);
+                            if (!mounted) return;
+                            setState(() {
+                              _cancelled = true;
+                              _serverRide = {...?_serverRide, 'status': 'CANCELADA'};
+                            });
+                            
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Viagem cancelada.')),
+                            );
+                          } catch (error) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  error.toString().replaceFirst('Exception: ', ''),
+                                ),
+                              ),
+                            );
+                          }
                         }
                       },
                       icon: const Icon(Icons.cancel_outlined),

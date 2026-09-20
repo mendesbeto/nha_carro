@@ -83,13 +83,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Escolha uma palavra-passe com pelo menos 6 caracteres.',
+                  'Escolha uma palavra-passe com pelo menos 8 caracteres.',
                 ),
                 const SizedBox(height: 28),
                 TextFormField(
                   controller: _password,
                   obscureText: _obscure,
-                  validator: (value) => value == null || value.length < 6
+                  validator: (value) => value == null || value.length < 8
                       ? 'A palavra-passe deve ter pelo menos 6 caracteres.'
                       : null,
                   decoration: InputDecoration(
