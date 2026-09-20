@@ -30,4 +30,6 @@ jobs:
           echo "$HOME/.render/bin" >> "$GITHUB_PATH"
 
       - name: Validate Blueprint
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
         run: render blueprints validate render.yaml --workspace tea-csp8nprgbbvc73a8okrg
