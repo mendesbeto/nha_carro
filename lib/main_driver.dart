@@ -260,17 +260,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
+          const Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: _SummaryCard(
                   title: 'Hoje',
                   value: '—',
                   icon: Icons.account_balance_wallet_rounded,
                 ),
               ),
-              const SizedBox(width: 12),
-              const Expanded(
+              SizedBox(width: 12),
+              Expanded(
                 child: _SummaryCard(
                   title: 'Viagens',
                   value: '—',
@@ -322,15 +322,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  Row(
+                  const Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: _MiniStat(
                             label: 'Tempo médio',
                             value: '—'),
                       ),
-                      const SizedBox(width: 10),
-                      const Expanded(
+                      SizedBox(width: 10),
+                      Expanded(
                         child: _MiniStat(
                             label: 'Receita',
                             value: '—'),
