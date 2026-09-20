@@ -30,4 +30,4 @@ jobs:
           echo "$HOME/.render/bin" >> "$GITHUB_PATH"
 
       - name: Validate Blueprint
-        run: render blueprints validate render.yaml
+        run: render blueprints validate render.yaml --workspace tea-csp8nprgbbvc73a8okrg
