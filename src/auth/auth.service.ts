@@ -94,9 +94,11 @@ export class AuthService {
       .auth.signInWithPassword({ email, password: dto.password });
 
     if (signedIn.error || !signedIn.data.session) {
+      await client.from('usuarios').delete().eq('id', authUser.id);
+      await client.auth.admin.deleteUser(authUser.id);
       throw new InternalServerErrorException(
         signedIn.error?.message ??
-          'Conta criada, mas não foi possível iniciar a sessão.',
+          'Não foi possível iniciar a sessão após criar a conta.',
       );
     }
 
