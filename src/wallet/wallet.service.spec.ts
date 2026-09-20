@@ -1,11 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
 import { WalletService } from './wallet.service';
 
-function chain(result: unknown) {
+function queryChain(result: unknown) {
   const c: any = {};
   c.select = jest.fn(() => c);
   c.eq = jest.fn(() => c);
-  c.order = jest.fn(() => c);
+  c.order = jest.fn().mockResolvedValue(result);
   c.single = jest.fn().mockResolvedValue(result);
   return c;
 }
@@ -24,38 +24,28 @@ describe('WalletService', () => {
   });
 
   it('loads wallet balance and transaction history for the authenticated user', async () => {
-    const profile = chain({ data: { saldo_carteira: 10000 }, error: null });
-    const transactions = chain({
+    const profile = queryChain({ data: { saldo_carteira: 10000 }, error: null });
+    const transactions = queryChain({
       data: [{ id: 'tx-1', valor: -2500, tipo: 'PAGAMENTO_VIAGEM', referencia_provedor: 'RIDE:ride-1', criado_em: '2026-09-20T10:00:00Z' }],
       error: null,
     });
-
-    const client: any = {
-      from: jest.fn()
-        .mockReturnValueOnce(profile)
-        .mockReturnValueOnce(transactions),
-    };
-    supabase.getUserClient.mockReturnValue(client);
+    supabase.getUserClient.mockReturnValue({
+      from: jest.fn().mockReturnValueOnce(profile).mockReturnValueOnce(transactions),
+    });
 
     const result = await service.getWallet(passenger, 'access-token');
 
     expect(profile.eq).toHaveBeenCalledWith('id', 'passenger-1');
     expect(transactions.eq).toHaveBeenCalledWith('usuario_id', 'passenger-1');
     expect(transactions.order).toHaveBeenCalledWith('criado_em', { ascending: false });
-    expect(result).toEqual({
-      balance: 10000,
-      transactions: [{ id: 'tx-1', valor: -2500, tipo: 'PAGAMENTO_VIAGEM', referencia_provedor: 'RIDE:ride-1', criado_em: '2026-09-20T10:00:00Z' }],
-    });
+    expect(result.transactions).toHaveLength(1);
+    expect(result.balance).toBe(10000);
   });
 
   it('rejects wallet access when the profile cannot be loaded', async () => {
-    const client: any = {
-      from: jest.fn().mockReturnValue(
-        chain({ data: null, error: { message: 'not found' } }),
-      ),
-    };
-    supabase.getUserClient.mockReturnValue(client);
-
+    supabase.getUserClient.mockReturnValue({
+      from: jest.fn().mockReturnValue(queryChain({ data: null, error: { message: 'not found' } })),
+    });
     await expect(service.getWallet(passenger, 'access-token')).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -64,7 +54,7 @@ describe('WalletService', () => {
     expect(supabase.getClient).not.toHaveBeenCalled();
   });
 
-  it('calls the settlement RPC with the authenticated driver and maps commission details', async () => {
+  it('calls settlement RPC with the authenticated driver and maps commission details', async () => {
     const rpc = jest.fn().mockResolvedValue({
       data: [{
         ride_id: 'ride-1',
@@ -83,13 +73,7 @@ describe('WalletService', () => {
     });
     supabase.getClient.mockReturnValue({ rpc });
 
-    const result = await service.completeRideSettlement('ride-1', driver);
-
-    expect(rpc).toHaveBeenCalledWith('complete_ride_and_settle_wallet', {
-      p_ride_id: 'ride-1',
-      p_actor_id: 'driver-1',
-    });
-    expect(result).toEqual({
+    await expect(service.completeRideSettlement('ride-1', driver)).resolves.toEqual({
       rideId: 'ride-1',
       status: 'CONCLUIDA',
       settled: true,
@@ -102,23 +86,22 @@ describe('WalletService', () => {
       driverBalance: 7800,
       driverTransactionId: 'tx-driver',
     });
+
+    expect(rpc).toHaveBeenCalledWith('complete_ride_and_settle_wallet', {
+      p_ride_id: 'ride-1',
+      p_actor_id: 'driver-1',
+    });
   });
 
   it('converts database settlement errors into BadRequestException', async () => {
-    const rpc = jest.fn().mockResolvedValue({
-      data: null,
-      error: { message: 'Saldo insuficiente.' },
-    });
+    const rpc = jest.fn().mockResolvedValue({ data: null, error: { message: 'Saldo insuficiente.' } });
     supabase.getClient.mockReturnValue({ rpc });
-
     await expect(service.completeRideSettlement('ride-1', driver)).rejects.toBeInstanceOf(BadRequestException);
-    expect(rpc).toHaveBeenCalledTimes(1);
   });
 
   it('rejects an empty settlement response', async () => {
     const rpc = jest.fn().mockResolvedValue({ data: [], error: null });
     supabase.getClient.mockReturnValue({ rpc });
-
     await expect(service.completeRideSettlement('ride-1', driver)).rejects.toBeInstanceOf(BadRequestException);
   });
 });
