@@ -205,10 +205,22 @@ export class RidesService {
       }
     }
 
-    const result = await client
+    let updateQuery = client
       .from('corridas')
       .update(changes)
-      .eq('id', rideId)
+      .eq('id', rideId);
+
+    if (changes.status === 'ACEITA') {
+      updateQuery = updateQuery.eq('status', 'SOLICITADA').is('motorista_id', null);
+    } else if (changes.status === 'EM_ANDAMENTO') {
+      updateQuery = updateQuery.eq('status', 'ACEITA').eq('motorista_id', user.sub);
+    } else {
+      updateQuery = updateQuery
+        .eq('passageiro_id', user.sub)
+        .in('status', ['SOLICITADA', 'ACEITA']);
+    }
+
+    const result = await updateQuery
       .select('id, passageiro_id, motorista_id, status')
       .single();
 
