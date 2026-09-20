@@ -88,7 +88,7 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
 
     final mapWidget = googleMapsApiKey.isEmpty
         ? Positioned.fill(
-            child: CustomPaint(painter: _TrackingMapPainter(0)),
+            child: CustomPaint(painter: _TrackingMapPainter(0.0)),
           )
         : Positioned.fill(
             child: GoogleMap(
