@@ -124,6 +124,24 @@ export class RidesService {
     }
 
     const client = this.supabase.getUserClient(accessToken);
+
+    const active = await client
+      .from('corridas')
+      .select('id')
+      .eq('motorista_id', user.sub)
+      .in('status', ['ACEITA', 'EM_ANDAMENTO'])
+      .limit(1);
+
+    if (active.error) {
+      throw new BadRequestException(
+        active.error.message ?? 'Não foi possível verificar a corrida ativa.',
+      );
+    }
+
+    if ((active.data ?? []).length > 0) {
+      return { rides: [] };
+    }
+
     const result = await client
       .from('corridas')
       .select(
@@ -271,6 +289,25 @@ export class RidesService {
     if (changes.status === 'ACEITA') {
       if (ride.status !== 'SOLICITADA' || ride.motorista_id !== null) {
         throw new BadRequestException('Esta corrida já não está disponível.');
+      }
+
+      const active = await client
+        .from('corridas')
+        .select('id')
+        .eq('motorista_id', user.sub)
+        .in('status', ['ACEITA', 'EM_ANDAMENTO'])
+        .limit(1);
+
+      if (active.error) {
+        throw new BadRequestException(
+          active.error.message ?? 'Não foi possível verificar a corrida ativa.',
+        );
+      }
+
+      if ((active.data ?? []).length > 0) {
+        throw new BadRequestException(
+          'Conclua a corrida atual antes de aceitar outra.',
+        );
       }
     } else if (changes.status === 'CANCELADA') {
       if (!isPassenger || !['SOLICITADA', 'ACEITA'].includes(ride.status)) {
