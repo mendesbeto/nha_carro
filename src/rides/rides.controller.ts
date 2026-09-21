@@ -29,6 +29,16 @@ export class RidesController {
     return this.ridesService.available(user, accessToken);
   }
 
+  @Patch('availability')
+  @UseGuards(JwtAuthGuard)
+  setAvailability(
+    @Body() body: { online: boolean; latitude?: number; longitude?: number },
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentAccessToken() accessToken: string,
+  ) {
+    return this.ridesService.setDriverAvailability(body, user, accessToken);
+  }
+
   @Get(':rideId')
   @UseGuards(JwtAuthGuard)
   get(
