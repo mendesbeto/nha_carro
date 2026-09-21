@@ -502,14 +502,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 )),
           const SizedBox(height: 16),
           FilledButton.icon(
-            onPressed: _online
-                ? () {
-                    if (_incomingRides.isEmpty) return;
-                    _acceptRide(_incomingRides.first);
-                  }
+            onPressed: _online && _incomingRides.isNotEmpty
+                ? () => _acceptRide(_incomingRides.first)
                 : null,
             icon: const Icon(Icons.local_taxi_outlined),
-            label: Text(_online ? 'Aceitar primeira corrida' : 'Ficar online'),
+            label: Text(
+              _online
+                  ? (_incomingRides.isEmpty
+                      ? 'Aguardando corrida'
+                      : 'Aceitar primeira corrida')
+                  : 'Ficar online',
+            ),
           ),
         ],
       ),
