@@ -29,6 +29,90 @@ export class RidesService {
   ) {}
 
 
+  async setDriverAvailability(
+    body: { online: boolean; latitude?: number; longitude?: number },
+    user: CurrentUserPayload,
+    accessToken: string,
+  ) {
+    if (user.role !== 'driver') {
+      throw new ForbiddenException('Apenas motoristas podem alterar a disponibilidade.');
+    }
+
+    const online = Boolean(body.online);
+    const latitude = body.latitude;
+    const longitude = body.longitude;
+
+    if (online && (typeof latitude !== 'number' || typeof longitude !== 'number')) {
+      throw new BadRequestException(
+        'A localização do motorista é necessária para ficar online.',
+      );
+    }
+
+    if (
+      online &&
+      (latitude! < -90 || latitude! > 90 || longitude! < -180 || longitude! > 180)
+    ) {
+      throw new BadRequestException('Coordenadas de localização inválidas.');
+    }
+
+    const client = this.supabase.getUserClient(accessToken);
+    const existing = await client
+      .from('posicoes_motoristas')
+      .select('motorista_id')
+      .eq('motorista_id', user.sub)
+      .maybeSingle();
+
+    if (existing.error) {
+      throw new BadRequestException(existing.error.message);
+    }
+
+    const payload: Record<string, unknown> = {
+      disponivel: online,
+      ultima_atualizacao: new Date().toISOString(),
+    };
+
+    if (online) {
+      payload.coordenadas = {
+        type: 'Point',
+        coordinates: [longitude, latitude],
+      };
+    } else if (!existing.data) {
+      throw new BadRequestException(
+        'Não é possível ficar offline antes de existir uma posição do motorista.',
+      );
+    }
+
+    const result = existing.data
+      ? await client
+          .from('posicoes_motoristas')
+          .update(payload)
+          .eq('motorista_id', user.sub)
+          .select('motorista_id, disponivel, ultima_atualizacao')
+          .single()
+      : await client
+          .from('posicoes_motoristas')
+          .insert({
+            motorista_id: user.sub,
+            coordenadas: payload.coordenadas,
+            disponivel: true,
+            ultima_atualizacao: payload.ultima_atualizacao,
+          })
+          .select('motorista_id, disponivel, ultima_atualizacao')
+          .single();
+
+    if (result.error || !result.data) {
+      throw new BadRequestException(
+        result.error?.message ?? 'Não foi possível atualizar a disponibilidade.',
+      );
+    }
+
+    return {
+      motoristaId: result.data.motorista_id,
+      online: result.data.disponivel,
+      ultimaAtualizacao: result.data.ultima_atualizacao,
+    };
+  }
+
   async available(
     user: CurrentUserPayload,
     accessToken: string,
