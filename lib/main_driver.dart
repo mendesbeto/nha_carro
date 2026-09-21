@@ -15,12 +15,6 @@ class NhaCarroDriverApp extends StatelessWidget {
   const NhaCarroDriverApp({super.key});
 
   @override
-  void dispose() {
-    _stopRidesPolling();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'NhaCarro Motorista',
@@ -61,7 +55,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       if (!mounted) return;
       setState(() => _online = savedStatus);
       await _loadWallet();
-      if (savedStatus) await _loadAvailableRides();
+      if (savedStatus) {
+        await _loadAvailableRides();
+        _startRidesPolling();
+      }
     });
   }
 
