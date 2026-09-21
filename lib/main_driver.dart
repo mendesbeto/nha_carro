@@ -93,9 +93,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         }
 
         final position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-          ),
+          desiredAccuracy: LocationAccuracy.high,
         );
 
         await _api.setDriverAvailability(
@@ -220,6 +218,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
       );
       await _loadAvailableRides();
+      if (!mounted) return;
     }
   }
 
