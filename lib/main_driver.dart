@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -11,6 +13,12 @@ void main() {
 
 class NhaCarroDriverApp extends StatelessWidget {
   const NhaCarroDriverApp({super.key});
+
+  @override
+  void dispose() {
+    _stopRidesPolling();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +48,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Map<String, dynamic>? _activeRide;
   bool _online = false;
   String _walletBalance = '—';
+  Timer? _ridesPollingTimer;
+  bool _loadingRides = false;
 
 
 
@@ -129,7 +139,26 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       _online = value;
       if (!value) _incomingRides = [];
     });
-    if (value) await _loadAvailableRides();
+    if (value) {
+      await _loadAvailableRides();
+      _startRidesPolling();
+    } else {
+      _stopRidesPolling();
+    }
+  }
+
+  void _startRidesPolling() {
+    _stopRidesPolling();
+    if (!_online) return;
+    _ridesPollingTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _loadAvailableRides(silent: true),
+    );
+  }
+
+  void _stopRidesPolling() {
+    _ridesPollingTimer?.cancel();
+    _ridesPollingTimer = null;
   }
 
   Future<void> _loadWallet() async {
@@ -143,17 +172,27 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
   }
 
-  Future<void> _loadAvailableRides() async {
-    if (!_online) return;
+  Future<void> _loadAvailableRides({bool silent = false}) async {
+    if (!_online || _loadingRides) return;
+    _loadingRides = true;
     try {
       final rides = await _api.getAvailableRides();
       if (!mounted) return;
+      final hadNoRides = _incomingRides.isEmpty;
       setState(() => _incomingRides = rides);
+      if (silent && hadNoRides && rides.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nova corrida disponível.')),
+        );
+      }
     } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
-      );
+      if (!silent && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    } finally {
+      _loadingRides = false;
     }
   }
 
@@ -220,6 +259,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _logout() async {
+    _stopRidesPolling();
     await ApiService().logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
