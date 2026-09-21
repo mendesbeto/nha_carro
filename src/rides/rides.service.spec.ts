@@ -57,11 +57,17 @@ describe('RidesService', () => {
       data: { id: 'ride-1', passageiro_id: 'passenger-1', motorista_id: null, status: 'SOLICITADA' },
       error: null,
     });
+    const active = queryChain({ data: [], error: null });
     const update = queryChain({
       data: { id: 'ride-1', passageiro_id: 'passenger-1', motorista_id: 'driver-1', status: 'ACEITA' },
       error: null,
     });
-    const client = { from: jest.fn().mockReturnValueOnce(current).mockReturnValueOnce(update) };
+    const client = {
+      from: jest.fn()
+        .mockReturnValueOnce(current)
+        .mockReturnValueOnce(active)
+        .mockReturnValueOnce(update),
+    };
     supabase.getUserClient.mockReturnValue(client);
 
     const result = await service.accept('ride-1', driver, token);
