@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import 'login_screen.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
-  final String token;
+  final String accessToken;
 
-  const ResetPasswordScreen({super.key, required this.token});
+  const ResetPasswordScreen({super.key, required this.accessToken});
 
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
@@ -31,7 +32,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
     try {
       await ApiService().resetPassword(
-        token: widget.token,
+        token: widget.accessToken,
         password: _password.text,
         passwordConfirmation: _confirmation.text,
       );
@@ -54,7 +55,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         ),
       );
       if (!mounted) return;
-      Navigator.of(context).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -90,7 +94,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   controller: _password,
                   obscureText: _obscure,
                   validator: (value) => value == null || value.length < 8
-                      ? 'A palavra-passe deve ter pelo menos 6 caracteres.'
+                      ? 'A palavra-passe deve ter pelo menos 8 caracteres.'
                       : null,
                   decoration: InputDecoration(
                     labelText: 'Nova palavra-passe',
