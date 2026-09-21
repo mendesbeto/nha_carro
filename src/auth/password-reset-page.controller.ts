@@ -5,7 +5,6 @@ import {
   Header,
   HttpCode,
   Post,
-  Throttle,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { PasswordResetService } from './password-reset.service';
@@ -47,13 +46,13 @@ export class PasswordResetPageController {
   const hash = window.location.hash.replace(/^#/, '');
   const params = new URLSearchParams(hash);
   const accessToken = params.get('access_token');
+  window.history.replaceState({}, document.title, window.location.pathname);
   if (!form || !tokenInput || !accessToken) {
     const box = document.getElementById('recovery-form');
     if (box) box.innerHTML = '<p>O link de recuperação está incompleto, inválido ou expirou.</p>';
     return;
   }
   tokenInput.value = accessToken;
-  window.history.replaceState({}, document.title, window.location.pathname);
 })();`;
   }
 
