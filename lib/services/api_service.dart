@@ -204,6 +204,32 @@ class ApiService {
     return data;
   }
 
+  Future<Map<String, dynamic>> setDriverAvailability({
+    required bool online,
+    double? latitude,
+    double? longitude,
+  }) async {
+    final response = await _authenticatedRequest(
+      () async => http.patch(
+        Uri.parse('$_baseUrl/rides/availability'),
+        headers: await _headers(authenticated: true),
+        body: jsonEncode({
+          'online': online,
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+        }),
+      ),
+    );
+
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(
+        data['error'] ?? 'Não foi possível atualizar a disponibilidade.',
+      );
+    }
+    return data;
+  }
+
   Future<List<Map<String, dynamic>>> getAvailableRides() async {
     final response = await _authenticatedRequest(
       () async => http.get(
