@@ -249,6 +249,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       });
       if (_online) {
         await _loadAvailableRides();
+        if (!mounted) return;
         _startRidesPolling();
       }
       ScaffoldMessenger.of(context).showSnackBar(
