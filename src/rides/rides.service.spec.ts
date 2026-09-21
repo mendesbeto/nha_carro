@@ -7,6 +7,7 @@ function queryChain(result: unknown) {
   c.eq = jest.fn(() => c);
   c.is = jest.fn(() => c);
   c.in = jest.fn(() => c);
+  c.limit = jest.fn(() => c);
   c.order = jest.fn().mockResolvedValue(result);
   c.maybeSingle = jest.fn().mockResolvedValue(result);
   c.single = jest.fn().mockResolvedValue(result);
