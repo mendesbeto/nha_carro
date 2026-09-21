@@ -5,7 +5,6 @@ import {
   Header,
   HttpCode,
   Post,
-  Query,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { PasswordResetService } from './password-reset.service';
@@ -16,18 +15,11 @@ export class PasswordResetPageController {
 
   @Get()
   @Header('Content-Type', 'text/html; charset=utf-8')
+  @Header('Cache-Control', 'no-store, max-age=0')
+  @Header('Referrer-Policy', 'no-referrer')
+  @Header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  page(@Query('token') token?: string): string {
-    if (token) {
-      return this.renderPage(
-        'Redefinir palavra-passe',
-        `<form method="post" action="/reset-password">
-          <input type="hidden" name="token" value="${this.escape(token)}">
-          ${this.formFields()}
-        </form>`,
-      );
-    }
-
+  page(): string {
     return this.renderPage(
       'Redefinir palavra-passe',
       `<div id="recovery-form">
@@ -43,6 +35,9 @@ export class PasswordResetPageController {
 
   @Get('recovery.js')
   @Header('Content-Type', 'application/javascript; charset=utf-8')
+  @Header('Cache-Control', 'no-store, max-age=0')
+  @Header('Referrer-Policy', 'no-referrer')
+  @Header('Content-Security-Policy', "default-src 'none'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'")
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   recoveryScript(): string {
     return `(() => {
@@ -51,19 +46,22 @@ export class PasswordResetPageController {
   const hash = window.location.hash.replace(/^#/, '');
   const params = new URLSearchParams(hash);
   const accessToken = params.get('access_token');
+  window.history.replaceState({}, document.title, window.location.pathname);
   if (!form || !tokenInput || !accessToken) {
     const box = document.getElementById('recovery-form');
     if (box) box.innerHTML = '<p>O link de recuperação está incompleto, inválido ou expirou.</p>';
     return;
   }
   tokenInput.value = accessToken;
-  window.history.replaceState({}, document.title, window.location.pathname);
 })();`;
   }
 
   @Post()
   @HttpCode(200)
   @Header('Content-Type', 'text/html; charset=utf-8')
+  @Header('Cache-Control', 'no-store, max-age=0')
+  @Header('Referrer-Policy', 'no-referrer')
+  @Header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async reset(
     @Body()
