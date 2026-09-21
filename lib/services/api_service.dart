@@ -284,7 +284,11 @@ class ApiService {
 
     final data = _decodeBody(response);
     if (response.statusCode >= 400) {
-      throw Exception(data['error'] ?? 'Não foi possível atualizar a corrida.');
+      throw Exception(
+        data['message'] ??
+            data['error'] ??
+            'Não foi possível atualizar a corrida.',
+      );
     }
     return data;
   }
