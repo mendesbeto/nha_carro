@@ -178,9 +178,13 @@ export class AuthService {
       return;
     }
 
-    await this.supabase
-      .getClient()
-      .auth.admin.signOut(refreshed.data.session.access_token);
+    const signedOut = await authClient.auth.signOut({ scope: 'local' });
+
+    if (signedOut.error) {
+      throw new InternalServerErrorException(
+        signedOut.error.message ?? 'Não foi possível encerrar a sessão.',
+      );
+    }
   }
 
   async getUserFromToken(payload: { sub: string; email: string; role: PublicUser['role'] }) {
