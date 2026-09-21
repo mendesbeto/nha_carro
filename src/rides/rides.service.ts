@@ -343,11 +343,19 @@ export class RidesService {
 
     const result = await updateQuery
       .select('id, passageiro_id, motorista_id, status')
-      .single();
+      .maybeSingle();
 
-    if (result.error || !result.data) {
+    if (result.error) {
       throw new BadRequestException(
-        result.error?.message ?? 'Não foi possível atualizar a corrida.',
+        `Falha ao atualizar a corrida: ${result.error.message}`,
+      );
+    }
+
+    if (!result.data) {
+      throw new BadRequestException(
+        changes.status === 'ACEITA'
+          ? 'A corrida deixou de estar disponível antes da aceitação.'
+          : 'A corrida não pôde ser atualizada porque o estado atual mudou.',
       );
     }
 
