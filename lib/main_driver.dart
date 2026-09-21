@@ -210,6 +210,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         _activeRide = accepted;
         _incomingRides.removeWhere((item) => item['rideId']?.toString() == rideId);
       });
+      _stopRidesPolling();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Corrida aceita no servidor.')),
       );
@@ -243,7 +244,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     try {
       final result = await _api.completeRide(rideId);
       if (!mounted) return;
-      setState(() => _activeRide = result);
+      setState(() {
+        _activeRide = result;
+        _incomingRides = [];
+      });
+      if (_online) {
+        await _loadAvailableRides();
+        _startRidesPolling();
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Corrida concluída e liquidação processada.')),
       );
