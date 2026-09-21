@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import 'screens/login_screen.dart';
 import 'services/api_service.dart';
@@ -70,6 +71,58 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _toggleOnline(bool value) async {
+    if (value) {
+      try {
+        final permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Permita o acesso à localização para ficar online.'),
+            ),
+          );
+          return;
+        }
+
+        final position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
+        );
+
+        await _api.setDriverAvailability(
+          online: true,
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+      } catch (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error.toString().replaceFirst('Exception: ', ''),
+            ),
+          ),
+        );
+        return;
+      }
+    } else {
+      try {
+        await _api.setDriverAvailability(online: false);
+      } catch (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error.toString().replaceFirst('Exception: ', ''),
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
     await _authService.saveDriverAvailability(value);
     if (!mounted) return;
     setState(() {
