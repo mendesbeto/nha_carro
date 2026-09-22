@@ -198,6 +198,7 @@ export class RidesService {
       nome: string;
       telefone: string;
       avaliacaoMedia: number | null;
+      localizacao: { latitude: number; longitude: number; atualizadaEm: string | null } | null;
       veiculo: { modelo: string; placa: string } | null;
     } | null = null;
 
@@ -205,7 +206,7 @@ export class RidesService {
       // Assemble passenger-facing driver data server-side so RLS does not
       // need to expose driver profile/vehicle tables globally.
       const serviceClient = this.supabase.getClient();
-      const [driverResult, vehicleResult] = await Promise.all([
+      const [driverResult, vehicleResult, locationResult] = await Promise.all([
         serviceClient
           .from('usuarios')
           .select('id, nome, telefone, avaliacao_media')
@@ -219,6 +220,11 @@ export class RidesService {
           .order('criado_em', { ascending: false })
           .limit(1)
           .maybeSingle(),
+        serviceClient
+          .from('posicoes_motoristas')
+          .select('coordenadas, ultima_atualizacao')
+          .eq('motorista_id', ride.motorista_id)
+          .maybeSingle(),
       ]);
 
       if (driverResult.error) {
@@ -228,11 +234,24 @@ export class RidesService {
       }
 
       if (driverResult.data) {
+        const location = locationResult.data?.coordenadas as
+          | { coordinates?: [number, number] }
+          | null;
+        const coordinates = location?.coordinates;
+
         motorista = {
           id: driverResult.data.id,
           nome: driverResult.data.nome,
           telefone: driverResult.data.telefone,
           avaliacaoMedia: driverResult.data.avaliacao_media,
+          localizacao:
+            coordinates && coordinates.length >= 2
+              ? {
+                  longitude: Number(coordinates[0]),
+                  latitude: Number(coordinates[1]),
+                  atualizadaEm: locationResult.data?.ultima_atualizacao ?? null,
+                }
+              : null,
           veiculo: vehicleResult.data
             ? {
                 modelo: vehicleResult.data.marca_modelo,
