@@ -193,10 +193,61 @@ export class RidesService {
       throw new ForbiddenException('Você não tem acesso a esta corrida.');
     }
 
+    let motorista: {
+      id: string;
+      nome: string;
+      telefone: string;
+      avaliacaoMedia: number | null;
+      veiculo: { modelo: string; placa: string } | null;
+    } | null = null;
+
+    if (ride.motorista_id) {
+      // Assemble passenger-facing driver data server-side so RLS does not
+      // need to expose driver profile/vehicle tables globally.
+      const serviceClient = this.supabase.getClient();
+      const [driverResult, vehicleResult] = await Promise.all([
+        serviceClient
+          .from('usuarios')
+          .select('id, nome, telefone, avaliacao_media')
+          .eq('id', ride.motorista_id)
+          .eq('tipo_perfil', 'MOTORISTA')
+          .maybeSingle(),
+        serviceClient
+          .from('veiculos_motoristas')
+          .select('marca_modelo, placa')
+          .eq('motorista_id', ride.motorista_id)
+          .order('criado_em', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      if (driverResult.error) {
+        throw new BadRequestException(
+          driverResult.error.message ?? 'Não foi possível carregar os dados do motorista.',
+        );
+      }
+
+      if (driverResult.data) {
+        motorista = {
+          id: driverResult.data.id,
+          nome: driverResult.data.nome,
+          telefone: driverResult.data.telefone,
+          avaliacaoMedia: driverResult.data.avaliacao_media,
+          veiculo: vehicleResult.data
+            ? {
+                modelo: vehicleResult.data.marca_modelo,
+                placa: vehicleResult.data.placa,
+              }
+            : null,
+        };
+      }
+    }
+
     return {
       rideId: ride.id,
       passageiroId: ride.passageiro_id,
       motoristaId: ride.motorista_id,
+      motorista,
       origem: ride.origem_coords,
       destino: ride.destino_coords,
       valor: ride.valor_total,
