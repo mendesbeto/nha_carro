@@ -15,6 +15,13 @@ class NhaCarroDriverApp extends StatelessWidget {
   const NhaCarroDriverApp({super.key});
 
   @override
+  void dispose() {
+    _stopRidesPolling();
+    _stopLocationUpdates();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'NhaCarro Motorista',
@@ -43,6 +50,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _online = false;
   String _walletBalance = '—';
   Timer? _ridesPollingTimer;
+  Timer? _locationUpdateTimer;
   bool _loadingRides = false;
 
 
@@ -58,6 +66,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       if (savedStatus) {
         await _loadAvailableRides();
         _startRidesPolling();
+        _startLocationUpdates();
       }
     });
   }
@@ -137,8 +146,43 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     if (value) {
       await _loadAvailableRides();
       _startRidesPolling();
+      _startLocationUpdates();
     } else {
       _stopRidesPolling();
+      _stopLocationUpdates();
+    }
+  }
+
+  void _startLocationUpdates() {
+    _stopLocationUpdates();
+    if (!_online) return;
+
+    _locationUpdateTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _sendCurrentLocation(),
+    );
+    _sendCurrentLocation();
+  }
+
+  void _stopLocationUpdates() {
+    _locationUpdateTimer?.cancel();
+    _locationUpdateTimer = null;
+  }
+
+  Future<void> _sendCurrentLocation() async {
+    if (!_online) return;
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      if (!_online) return;
+      await _api.setDriverAvailability(
+        online: true,
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+    } catch (_) {
+      // A temporary location/network failure should not take the driver offline.
     }
   }
 
@@ -265,6 +309,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> _logout() async {
     _stopRidesPolling();
+    _stopLocationUpdates();
     await ApiService().logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
