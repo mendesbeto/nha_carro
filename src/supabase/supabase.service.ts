@@ -71,19 +71,15 @@ export class SupabaseService {
       );
     }
 
-    // Bind the caller's JWT to this client so database requests carry the
-    // same identity that was validated by Supabase Auth and can be checked
-    // by PostgreSQL RLS.
+    // Bind the caller's Supabase JWT using the current supabase-js accessToken
+    // option. This makes the JWT the source of truth for Data API/RLS requests,
+    // including auth.uid() inside PostgreSQL triggers and policies.
     return createClient(this.authUrl, this.authKey, {
+      accessToken: async () => accessToken,
       auth: {
         autoRefreshToken: false,
         persistSession: false,
         detectSessionInUrl: false,
-      },
-      global: {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
       },
     });
   }
