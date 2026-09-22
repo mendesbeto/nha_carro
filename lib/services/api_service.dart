@@ -47,7 +47,9 @@ class ApiService {
 
     final data = _decodeBody(response);
     if (response.statusCode >= 400) {
-      throw Exception(data['error'] ?? 'Erro ao criar conta.');
+      throw Exception(
+        data['message'] ?? data['error'] ?? 'Erro ao criar conta.',
+      );
     }
     return data;
   }
@@ -133,7 +135,9 @@ class ApiService {
 
     final data = _decodeBody(response);
     if (response.statusCode >= 400) {
-      throw Exception(data['error'] ?? 'Credenciais inválidas.');
+      throw Exception(
+        data['message'] ?? data['error'] ?? 'Credenciais inválidas.',
+      );
     }
     return data;
   }
@@ -224,7 +228,9 @@ class ApiService {
     final data = _decodeBody(response);
     if (response.statusCode >= 400) {
       throw Exception(
-        data['error'] ?? 'Não foi possível atualizar a disponibilidade.',
+        data['message'] ??
+            data['error'] ??
+            'Não foi possível atualizar a disponibilidade.',
       );
     }
     return data;
@@ -240,12 +246,19 @@ class ApiService {
 
     final data = _decodeBody(response);
     if (response.statusCode >= 400) {
-      throw Exception(data['error'] ?? 'Não foi possível carregar as corridas disponíveis.');
+      throw Exception(
+        data['message'] ??
+            data['error'] ??
+            'Não foi possível carregar as corridas disponíveis.',
+      );
     }
 
     final rides = data['rides'];
     if (rides is! List) return <Map<String, dynamic>>[];
-    return rides.whereType<Map>().map((ride) => Map<String, dynamic>.from(ride)).toList();
+    return rides
+        .whereType<Map>()
+        .map((ride) => Map<String, dynamic>.from(ride))
+        .toList();
   }
 
   Future<Map<String, dynamic>> getRide(String rideId) async {
@@ -257,7 +270,9 @@ class ApiService {
     );
     final data = _decodeBody(response);
     if (response.statusCode >= 400) {
-      throw Exception(data['error'] ?? 'Não foi possível carregar a corrida.');
+      throw Exception(
+        data['message'] ?? data['error'] ?? 'Não foi possível carregar a corrida.',
+      );
     }
     return data;
   }
@@ -320,7 +335,9 @@ class ApiService {
 
     final data = _decodeBody(response);
     if (response.statusCode >= 400) {
-      throw Exception(data['error'] ?? 'Erro ao solicitar corrida.');
+      throw Exception(
+        data['message'] ?? data['error'] ?? 'Erro ao solicitar corrida.',
+      );
     }
 
     return RideRequest(
@@ -332,7 +349,9 @@ class ApiService {
         orElse: () => category,
       ),
       paymentMethod: PaymentMethod.values.firstWhere(
-        (value) => value.name == (data['paymentMethod'] as String? ?? paymentMethod.name),
+        (value) =>
+            value.name ==
+            (data['paymentMethod'] as String? ?? paymentMethod.name),
         orElse: () => paymentMethod,
       ),
       estimatedFare: data['estimatedFare'] as int? ?? _fareFor(category),
