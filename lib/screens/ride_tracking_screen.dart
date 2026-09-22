@@ -30,6 +30,37 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
           ? Map<String, dynamic>.from(_serverRide!['motorista'] as Map)
           : null;
 
+  LatLng? _pointFromGeometry(dynamic raw) {
+    if (raw is Map) {
+      final coords = raw['coordinates'];
+      if (coords is List && coords.length >= 2) {
+        final lng = num.tryParse(coords[0].toString());
+        final lat = num.tryParse(coords[1].toString());
+        if (lat != null && lng != null) {
+          return LatLng(lat.toDouble(), lng.toDouble());
+        }
+      }
+    }
+    return null;
+  }
+
+  LatLng? get _driverLocation {
+    final location = _driver?['localizacao'];
+    if (location is Map) {
+      final lat = num.tryParse(location['latitude']?.toString() ?? '');
+      final lng = num.tryParse(location['longitude']?.toString() ?? '');
+      if (lat != null && lng != null) {
+        return LatLng(lat.toDouble(), lng.toDouble());
+      }
+    }
+    return null;
+  }
+
+  LatLng? get _destinationLocation => _pointFromGeometry(_serverRide?['destino']);
+
+  LatLng get _mapCenter =>
+      _driverLocation ?? _destinationLocation ?? const LatLng(11.8811, -15.6177);
+
   String get _tripStageLabel {
     switch (_serverStatus) {
       case 'ACEITA': return 'Motorista a caminho';
@@ -93,13 +124,13 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
 
     final mapWidget = googleMapsApiKey.isEmpty
         ? Positioned.fill(
-            child: CustomPaint(painter: _TrackingMapPainter(0.0)),
+            child: CustomPaint(painter: _TrackingMapPainter(_driver != null)),
           )
         : Positioned.fill(
             child: GoogleMap(
-              initialCameraPosition: const CameraPosition(
-                target: LatLng(11.8811, -15.6177),
-                zoom: 12,
+              initialCameraPosition: CameraPosition(
+                target: _mapCenter,
+                zoom: 13,
               ),
               myLocationEnabled: true,
               myLocationButtonEnabled: false,
@@ -107,17 +138,18 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
               compassEnabled: false,
               mapToolbarEnabled: false,
               markers: {
-                if (_driver != null)
-                  const Marker(
-                    markerId: MarkerId('driver'),
-                    position: LatLng(11.8811, -15.6177),
-                    infoWindow: InfoWindow(title: 'Motorista'),
+                if (_driverLocation != null)
+                  Marker(
+                    markerId: const MarkerId('driver'),
+                    position: _driverLocation!,
+                    infoWindow: const InfoWindow(title: 'Motorista'),
                   ),
-                Marker(
-                  markerId: const MarkerId('destination'),
-                  position: const LatLng(11.8811, -15.6177),
-                  infoWindow: InfoWindow(title: widget.ride.destination),
-                ),
+                if (_destinationLocation != null)
+                  Marker(
+                    markerId: const MarkerId('destination'),
+                    position: _destinationLocation!,
+                    infoWindow: InfoWindow(title: widget.ride.destination),
+                  ),
               },
             ),
           );
@@ -361,9 +393,9 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
 }
 
 class _TrackingMapPainter extends CustomPainter {
-  _TrackingMapPainter(this.progress);
+  _TrackingMapPainter(this.showDriver);
 
-  final double progress;
+  final bool showDriver;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -380,16 +412,14 @@ class _TrackingMapPainter extends CustomPainter {
     final end = Offset(size.width * .78, size.height * .25);
     canvas.drawLine(start, end, road);
     canvas.drawLine(start, end, route);
-    final driver = Offset(
-      start.dx + (end.dx - start.dx) * progress,
-      start.dy + (end.dy - start.dy) * progress,
-    );
-    canvas.drawCircle(driver, 19, Paint()..color = const Color(0xFF0B8F62));
-    canvas.drawCircle(driver, 9, Paint()..color = Colors.white);
+    if (showDriver) {
+      canvas.drawCircle(start, 19, Paint()..color = const Color(0xFF0B8F62));
+      canvas.drawCircle(start, 9, Paint()..color = Colors.white);
+    }
     canvas.drawCircle(end, 13, Paint()..color = const Color(0xFFE39A1E));
   }
 
   @override
   bool shouldRepaint(covariant _TrackingMapPainter oldDelegate) =>
-      oldDelegate.progress != progress;
+      oldDelegate.showDriver != showDriver;
 }
