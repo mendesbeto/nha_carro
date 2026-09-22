@@ -25,6 +25,11 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
 
   String get _serverStatus => _serverRide?['status']?.toString() ?? 'SOLICITADA';
 
+  Map<String, dynamic>? get _driver =>
+      _serverRide?['motorista'] is Map
+          ? Map<String, dynamic>.from(_serverRide!['motorista'] as Map)
+          : null;
+
   String get _tripStageLabel {
     switch (_serverStatus) {
       case 'ACEITA': return 'Motorista a caminho';
@@ -102,11 +107,12 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
               compassEnabled: false,
               mapToolbarEnabled: false,
               markers: {
-                const Marker(
-                  markerId: MarkerId('driver'),
-                  position: LatLng(11.8811, -15.6177),
-                  infoWindow: InfoWindow(title: 'Motorista'),
-                ),
+                if (_driver != null)
+                  const Marker(
+                    markerId: MarkerId('driver'),
+                    position: LatLng(11.8811, -15.6177),
+                    infoWindow: InfoWindow(title: 'Motorista'),
+                  ),
                 Marker(
                   markerId: const MarkerId('destination'),
                   position: const LatLng(11.8811, -15.6177),
@@ -158,35 +164,57 @@ class _RideTrackingScreenState extends State<RideTrackingScreen> {
               style: const TextStyle(color: Colors.black54, fontSize: 12),
             ),
             const SizedBox(height: 15),
-            Row(
-              children: [
-                const CircleAvatar(
-                  radius: 26,
-                  backgroundColor: Color(0xFFDDF5EA),
-                  child: Icon(Icons.person, color: Color(0xFF0B8F62)),
+            if (_driver == null)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.search_rounded, color: Color(0xFF0B8F62)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Nenhum motorista aceitou ainda. Aguardando disponibilidade...',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Mamadou S.', style: TextStyle(fontWeight: FontWeight.w800)),
-                      Text('Toyota Corolla · AZ-24-GB', style: TextStyle(color: Colors.black54)),
-                      Text('★ 4.9', style: TextStyle(color: Color(0xFFE39A1E))),
-                    ],
+              )
+            else
+              Row(
+                children: [
+                  const CircleAvatar(
+                    radius: 26,
+                    backgroundColor: Color(0xFFDDF5EA),
+                    child: Icon(Icons.person, color: Color(0xFF0B8F62)),
                   ),
-                ),
-                IconButton.filledTonal(
-                  onPressed: () {},
-                  icon: const Icon(Icons.phone_outlined),
-                ),
-                const SizedBox(width: 6),
-                IconButton.filledTonal(
-                  onPressed: () {},
-                  icon: const Icon(Icons.chat_bubble_outline),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _driver!['nome']?.toString() ?? 'Motorista',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        Text(
+                          (_driver!['veiculo'] is Map)
+                              ? '${(_driver!['veiculo'] as Map)['modelo'] ?? 'Veículo'} · ${(_driver!['veiculo'] as Map)['placa'] ?? 'Matrícula'}'
+                              : 'Veículo não informado',
+                          style: const TextStyle(color: Colors.black54),
+                        ),
+                        Text(
+                          '★ ${(_driver!['avaliacaoMedia'] as num?)?.toStringAsFixed(1) ?? '—'}',
+                          style: const TextStyle(color: Color(0xFFE39A1E)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton.filledTonal(onPressed: () {}, icon: const Icon(Icons.phone_outlined)),
+                  const SizedBox(width: 6),
+                  IconButton.filledTonal(onPressed: () {}, icon: const Icon(Icons.chat_bubble_outline)),
+                ],
+              ),
             const Divider(height: 24),
             Row(
               children: [
