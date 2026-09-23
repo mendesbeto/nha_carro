@@ -149,7 +149,7 @@ export class RidesService {
       )
       .eq('status', 'SOLICITADA')
       .is('motorista_id', null)
-      .order('criado_em', { ascending: true });
+      .order('criado_em', { ascending: false });
 
     if (result.error) {
       throw new BadRequestException(
