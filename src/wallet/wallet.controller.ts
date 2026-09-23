@@ -20,6 +20,16 @@ export class WalletController {
     return this.walletService.getWallet(user, accessToken);
   }
 
+  @Post('topup')
+  @UseGuards(JwtAuthGuard)
+  createTopUp(
+    @Body() body: { amount?: number; method?: 'orangeMoney' | 'mtnMoney'; idempotencyKey?: string },
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentAccessToken() accessToken: string,
+  ) {
+    return this.walletService.createTopUp(body, user, accessToken);
+  }
+
   @Post('test-topup')
   @UseGuards(JwtAuthGuard)
   testTopUp(
