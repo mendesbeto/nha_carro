@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import {
   CurrentAccessToken,
@@ -18,5 +18,14 @@ export class WalletController {
     @CurrentAccessToken() accessToken: string,
   ) {
     return this.walletService.getWallet(user, accessToken);
+  }
+
+  @Post('test-topup')
+  @UseGuards(JwtAuthGuard)
+  testTopUp(
+    @Body() body: { amount?: number; method?: 'orangeMoney' | 'mtnMoney' },
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.walletService.testTopUp(body, user);
   }
 }
