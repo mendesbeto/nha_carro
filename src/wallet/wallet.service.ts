@@ -106,7 +106,7 @@ export class WalletService {
     }
 
     const topupId = randomUUID();
-    const callbackUrl = `${callbackBase.replace(/\\/$/, '')}/${method}`;
+    const callbackUrl = `${callbackBase.replace(/\/$/, '')}/${method}`;
 
     const created = await admin
       .from('recargas_carteira')
