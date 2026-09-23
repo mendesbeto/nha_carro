@@ -1,10 +1,15 @@
 import { BadRequestException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { PaymentProviderFactory } from './payment-provider.factory';
 import { CurrentUserPayload } from '../auth/current-user.decorator';
 import { SupabaseService } from '../supabase/supabase.service';
 
 @Injectable()
 export class WalletService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly paymentProviders: PaymentProviderFactory,
+  ) {}
 
   async getWallet(user: CurrentUserPayload, accessToken: string) {
     const client = this.supabase.getUserClient(accessToken);
@@ -61,9 +66,11 @@ export class WalletService {
       throw new BadRequestException('Chave de idempotência obrigatória.');
     }
 
-    // Payment records are created by the trusted backend, never directly by
-    // the mobile client. The authenticated JWT has already been validated by
-    // JwtAuthGuard and user.sub is the authoritative account id.
+    // Do not create a payment record unless the selected real provider is
+    // actually configured. This prevents permanent PENDENTE charges while
+    // the provider adapter is still awaiting merchant onboarding/credentials.
+    const provider = this.paymentProviders.get(method);
+
     const admin = this.supabase.getClient();
 
     const existing = await admin
@@ -81,9 +88,30 @@ export class WalletService {
       return { ...existing.data, reused: true };
     }
 
+    const callbackBase = process.env.WALLET_WEBHOOK_URL?.trim();
+    if (!callbackBase) {
+      throw new ServiceUnavailableException(
+        'Webhook de pagamento ainda não está configurado no servidor.',
+      );
+    }
+
+    const profile = await admin
+      .from('usuarios')
+      .select('telefone')
+      .eq('id', user.sub)
+      .single();
+
+    if (profile.error || !profile.data) {
+      throw new BadRequestException('Telefone do usuário não encontrado.');
+    }
+
+    const topupId = randomUUID();
+    const callbackUrl = `${callbackBase.replace(/\\/$/, '')}/${method}`;
+
     const created = await admin
       .from('recargas_carteira')
       .insert({
+        id: topupId,
         usuario_id: user.sub,
         valor: amount.toFixed(2),
         metodo: method,
@@ -94,8 +122,6 @@ export class WalletService {
       .single();
 
     if (created.error || !created.data) {
-      // A concurrent request with the same idempotency key may have won the
-      // unique race. Return that record instead of creating a second charge.
       const raced = await admin
         .from('recargas_carteira')
         .select('id, valor, metodo, status, referencia_provedor, checkout_url, criado_em')
@@ -112,7 +138,52 @@ export class WalletService {
       );
     }
 
-    return { ...created.data, reused: false };
+    try {
+      const payment = await provider.createPayment({
+        amount,
+        currency: 'XOF',
+        reference: topupId,
+        customerPhone: profile.data.telefone ?? undefined,
+        callbackUrl,
+      });
+
+      const updated = await admin
+        .from('recargas_carteira')
+        .update({
+          status: payment.status === 'PROCESSING' ? 'PROCESSANDO' : 'PENDENTE',
+          referencia_provedor: payment.providerReference,
+          checkout_url: payment.checkoutUrl ?? null,
+          resposta_provedor: payment.raw ?? null,
+        })
+        .eq('id', topupId)
+        .select('id, valor, metodo, status, referencia_provedor, checkout_url, criado_em')
+        .single();
+
+      if (updated.error || !updated.data) {
+        throw new BadRequestException(
+          updated.error?.message ?? 'Pagamento criado, mas a recarga não pôde ser atualizada.',
+        );
+      }
+
+      return { ...updated.data, reused: false };
+    } catch (error) {
+      await admin
+        .from('recargas_carteira')
+        .update({
+          status: 'FALHOU',
+          resposta_provedor: {
+            error: error instanceof Error ? error.message : 'Falha ao iniciar pagamento.',
+          },
+        })
+        .eq('id', topupId)
+        .in('status', ['PENDENTE', 'PROCESSANDO']);
+
+      throw error instanceof ServiceUnavailableException
+        ? error
+        : new ServiceUnavailableException(
+            'Não foi possível iniciar o pagamento no provedor. A recarga não foi creditada.',
+          );
+    }
   }
 
   async handleWebhook(
