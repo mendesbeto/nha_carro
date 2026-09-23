@@ -17,5 +17,6 @@ export type PaymentInitResult = {
 
 export interface PaymentProvider {
   readonly method: PaymentMethod;
+  isEnabled(): boolean;
   createPayment(input: PaymentInitRequest): Promise<PaymentInitResult>;
 }
