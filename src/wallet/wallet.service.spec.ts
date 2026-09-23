@@ -5,7 +5,7 @@ function queryChain(result: unknown) {
   const c: any = {};
   c.select = jest.fn(() => c);
   c.eq = jest.fn(() => c);
-  c.order = jest.fn(() => c);
+  c.order = jest.fn(() => Promise.resolve(result));
   c.in = jest.fn(() => c);
   c.limit = jest.fn(() => c);
   c.single = jest.fn().mockResolvedValue(result);
@@ -44,7 +44,9 @@ describe('WalletService', () => {
     expect(profile.eq).toHaveBeenCalledWith('id', 'passenger-1');
     expect(transactions.eq).toHaveBeenCalledWith('usuario_id', 'passenger-1');
     expect(transactions.order).toHaveBeenCalledWith('criado_em', { ascending: false });
-    expect(result.transactions).toHaveLength(1);
+    expect(result.transactions).toEqual([
+      expect.objectContaining({ id: 'tx-1', valor: -2500, tipo: 'PAGAMENTO_VIAGEM' }),
+    ]);
     expect(result.balance).toBe(10000);
   });
 
