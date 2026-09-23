@@ -32,6 +32,7 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
   PaymentMethod _payment = PaymentMethod.cash;
   bool _loading = false;
   bool _locationLoading = false;
+  bool _walletTestMode = false;
   bool _rideAccepted = false;
   int _selectedTab = 0;
   int _walletBalance = 5000;
@@ -235,6 +236,7 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
     try {
       final remote = await _api.getWallet();
       wallet = (remote['balance'] as num?)?.round() ?? localWallet;
+      _walletTestMode = remote['testMode'] == true;
       final remoteTransactions = remote['transactions'];
       if (remoteTransactions is List) {
         transactions = remoteTransactions
@@ -331,15 +333,39 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
 
     if (amount == null || !mounted) return;
 
+    if (_walletTestMode) {
+      try {
+        final result = await _api.testTopUp(
+          amount: amount.toDouble(),
+          method: _payment == PaymentMethod.mtnMoney ? 'mtnMoney' : 'orangeMoney',
+        );
+        await _loadHistory();
+        if (!mounted) return;
+        final balance = (result['balance'] as num?)?.round();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              balance == null
+                  ? 'Recarga de teste realizada: $amount CFA.'
+                  : 'Recarga de teste realizada. Saldo: $balance CFA.',
+            ),
+          ),
+        );
+      } catch (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('O carregamento da carteira será disponibilizado após integração com o provedor de pagamento.'),
+        content: Text(
+          'O carregamento da carteira será disponibilizado após integração com o provedor de pagamento.',
+        ),
       ),
-    );
-    await _loadHistory();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Carteira carregada com $amount CFA')),
     );
   }
 
