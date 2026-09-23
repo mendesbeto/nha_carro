@@ -291,7 +291,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final rideId = _activeRide?['rideId']?.toString();
     if (rideId == null || rideId.isEmpty) return;
     try {
-      final result = await _api.completeRide(rideId);
+      await _api.completeRide(rideId);
       if (!mounted) return;
       setState(() {
         _activeRide = null;
