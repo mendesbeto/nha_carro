@@ -16,11 +16,12 @@ const driver = { sub: 'driver-1', email: 'd@example.com', role: 'driver' as cons
 describe('WalletService', () => {
   let supabase: { getUserClient: jest.Mock; getClient: jest.Mock };
   let service: WalletService;
+  const paymentProviders = { get: jest.fn() };
 
   beforeEach(() => {
     jest.clearAllMocks();
     supabase = { getUserClient: jest.fn(), getClient: jest.fn() };
-    service = new WalletService(supabase as never);
+    service = new WalletService(supabase as never, paymentProviders as never);
   });
 
   it('loads wallet balance and transaction history for the authenticated user', async () => {
