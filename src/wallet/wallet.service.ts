@@ -41,33 +41,47 @@ export class WalletService {
   async createTopUp(
     body: { amount?: number; method?: 'orangeMoney' | 'mtnMoney'; idempotencyKey?: string },
     user: CurrentUserPayload,
-    accessToken: string,
+    _accessToken: string,
   ) {
     const amount = Number(body.amount);
     if (!Number.isFinite(amount) || amount <= 0 || amount > 100000) {
       throw new BadRequestException('A recarga deve estar entre 1 e 100.000 CFA.');
     }
+
     const method =
       body.method === 'mtnMoney' ? 'MTN_MONEY' :
       body.method === 'orangeMoney' ? 'ORANGE_MONEY' : null;
-    if (!method) throw new BadRequestException('Método de pagamento inválido.');
+
+    if (!method) {
+      throw new BadRequestException('Método de pagamento inválido.');
+    }
+
     const idempotencyKey = body.idempotencyKey?.trim();
     if (!idempotencyKey || idempotencyKey.length > 120) {
       throw new BadRequestException('Chave de idempotência obrigatória.');
     }
 
-    const client = this.supabase.getUserClient(accessToken);
-    const existing = await client
+    // Payment records are created by the trusted backend, never directly by
+    // the mobile client. The authenticated JWT has already been validated by
+    // JwtAuthGuard and user.sub is the authoritative account id.
+    const admin = this.supabase.getClient();
+
+    const existing = await admin
       .from('recargas_carteira')
       .select('id, valor, metodo, status, referencia_provedor, checkout_url, criado_em')
       .eq('usuario_id', user.sub)
       .eq('chave_idempotencia', idempotencyKey)
       .maybeSingle();
 
-    if (existing.error) throw new BadRequestException(existing.error.message);
-    if (existing.data) return { ...existing.data, reused: true };
+    if (existing.error) {
+      throw new BadRequestException(existing.error.message);
+    }
 
-    const created = await client
+    if (existing.data) {
+      return { ...existing.data, reused: true };
+    }
+
+    const created = await admin
       .from('recargas_carteira')
       .insert({
         usuario_id: user.sub,
@@ -80,8 +94,24 @@ export class WalletService {
       .single();
 
     if (created.error || !created.data) {
-      throw new BadRequestException(created.error?.message ?? 'Não foi possível criar a recarga.');
+      // A concurrent request with the same idempotency key may have won the
+      // unique race. Return that record instead of creating a second charge.
+      const raced = await admin
+        .from('recargas_carteira')
+        .select('id, valor, metodo, status, referencia_provedor, checkout_url, criado_em')
+        .eq('usuario_id', user.sub)
+        .eq('chave_idempotencia', idempotencyKey)
+        .maybeSingle();
+
+      if (raced.data) {
+        return { ...raced.data, reused: true };
+      }
+
+      throw new BadRequestException(
+        created.error?.message ?? 'Não foi possível criar a recarga.',
+      );
     }
+
     return { ...created.data, reused: false };
   }
 
