@@ -15,13 +15,6 @@ class NhaCarroDriverApp extends StatelessWidget {
   const NhaCarroDriverApp({super.key});
 
   @override
-  void dispose() {
-    _stopRidesPolling();
-    _stopLocationUpdates();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'NhaCarro Motorista',
@@ -346,6 +339,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _stopRidesPolling();
+    _stopLocationUpdates();
+    super.dispose();
   }
 
   @override
