@@ -34,6 +34,7 @@ export class WalletService {
     return {
       balance: profile.data.saldo_carteira,
       transactions: transactions.data ?? [],
+      testMode: process.env.WALLET_TEST_MODE === 'true',
     };
   }
 
