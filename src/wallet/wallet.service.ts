@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { CurrentUserPayload } from '../auth/current-user.decorator';
 import { SupabaseService } from '../supabase/supabase.service';
 
@@ -34,6 +34,51 @@ export class WalletService {
     return {
       balance: profile.data.saldo_carteira,
       transactions: transactions.data ?? [],
+    };
+  }
+
+  async testTopUp(
+    body: { amount?: number; method?: 'orangeMoney' | 'mtnMoney' },
+    user: CurrentUserPayload,
+  ) {
+    if (process.env.WALLET_TEST_MODE !== 'true') {
+      throw new ServiceUnavailableException(
+        'Recarga de teste desativada. Use uma integração de pagamento real.',
+      );
+    }
+
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 10000) {
+      throw new BadRequestException(
+        'A recarga de teste deve estar entre 1 e 10.000 CFA.',
+      );
+    }
+
+    const type =
+      body.method === 'mtnMoney' ? 'RECARGA_MTN' : 'RECARGA_ORANGE';
+
+    const result = await this.supabase
+      .getClient()
+      .rpc('test_top_up_wallet', {
+        p_user_id: user.sub,
+        p_amount: amount,
+        p_type: type,
+      });
+
+    if (result.error || !result.data?.[0]) {
+      throw new BadRequestException(
+        result.error?.message ?? 'Não foi possível realizar a recarga de teste.',
+      );
+    }
+
+    const topUp = result.data[0];
+    return {
+      balance: topUp.balance,
+      amount: topUp.amount,
+      type: topUp.type,
+      transactionId: topUp.transaction_id,
+      reference: topUp.reference,
+      testMode: true,
     };
   }
 
