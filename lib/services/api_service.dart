@@ -236,6 +236,29 @@ class ApiService {
     return data;
   }
 
+  Future<Map<String, dynamic>?> getActiveRide() async {
+    final response = await _authenticatedRequest(
+      () async => http.get(
+        Uri.parse('$_baseUrl/rides/active'),
+        headers: await _headers(authenticated: true),
+      ),
+    );
+
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(
+        data['message'] ??
+            data['error'] ??
+            'Não foi possível recuperar a corrida ativa.',
+      );
+    }
+
+    final ride = data['ride'];
+    if (ride is! Map) return null;
+    return Map<String, dynamic>.from(ride);
+  }
+
+
   Future<List<Map<String, dynamic>>> getAvailableRides() async {
     final response = await _authenticatedRequest(
       () async => http.get(
