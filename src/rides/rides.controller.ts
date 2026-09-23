@@ -20,6 +20,16 @@ import { RidesService } from './rides.service';
 export class RidesController {
   constructor(private readonly ridesService: RidesService) {}
 
+  @Get('active')
+  @UseGuards(JwtAuthGuard)
+  active(
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentAccessToken() accessToken: string,
+  ) {
+    return this.ridesService.active(user, accessToken);
+  }
+
+
   @Get('available')
   @UseGuards(JwtAuthGuard)
   available(
