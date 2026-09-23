@@ -48,7 +48,7 @@ describe('RidesService', () => {
 
     expect(query.eq).toHaveBeenCalledWith('status', 'SOLICITADA');
     expect(query.is).toHaveBeenCalledWith('motorista_id', null);
-    expect(query.order).toHaveBeenCalledWith('criado_em', { ascending: true });
+    expect(query.order).toHaveBeenCalledWith('criado_em', { ascending: false });
     expect(result.rides[0]).toMatchObject({ rideId: 'ride-1', valor: 2500, status: 'SOLICITADA' });
   });
 
