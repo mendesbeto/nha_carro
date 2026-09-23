@@ -193,6 +193,32 @@ class ApiService {
     return data;
   }
 
+  Future<Map<String, dynamic>> testTopUp({
+    required double amount,
+    String method = 'orangeMoney',
+  }) async {
+    final response = await _authenticatedRequest(
+      () async => http.post(
+        Uri.parse('$_baseUrl/wallet/test-topup'),
+        headers: await _headers(authenticated: true),
+        body: jsonEncode({
+          'amount': amount,
+          'method': method,
+        }),
+      ),
+    );
+
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(
+        data['message'] ??
+            data['error'] ??
+            'Não foi possível realizar a recarga de teste.',
+      );
+    }
+    return data;
+  }
+
   Future<Map<String, dynamic>> me() async {
     final response = await _authenticatedRequest(
       () async => http.get(
