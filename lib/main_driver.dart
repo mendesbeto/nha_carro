@@ -208,6 +208,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     if (!_online || _loadingRides) return;
     _loadingRides = true;
     try {
+      // Recover an accepted/in-progress ride after app restart or reconnect.
+      // While a ride is active, the server intentionally hides new requests.
+      final activeRide = await _api.getActiveRide();
+      if (!mounted) return;
+      if (activeRide != null) {
+        setState(() {
+          _activeRide = activeRide;
+          _incomingRides = [];
+        });
+        return;
+      }
+
+      setState(() => _activeRide = null);
       final rides = await _api.getAvailableRides();
       if (!mounted) return;
       final hadNoRides = _incomingRides.isEmpty;
@@ -281,7 +294,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       final result = await _api.completeRide(rideId);
       if (!mounted) return;
       setState(() {
-        _activeRide = result;
+        _activeRide = null;
         _incomingRides = [];
       });
       if (_online) {
