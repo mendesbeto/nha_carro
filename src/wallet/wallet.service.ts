@@ -38,6 +38,53 @@ export class WalletService {
     };
   }
 
+  async createTopUp(
+    body: { amount?: number; method?: 'orangeMoney' | 'mtnMoney'; idempotencyKey?: string },
+    user: CurrentUserPayload,
+    accessToken: string,
+  ) {
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 100000) {
+      throw new BadRequestException('A recarga deve estar entre 1 e 100.000 CFA.');
+    }
+    const method =
+      body.method === 'mtnMoney' ? 'MTN_MONEY' :
+      body.method === 'orangeMoney' ? 'ORANGE_MONEY' : null;
+    if (!method) throw new BadRequestException('Método de pagamento inválido.');
+    const idempotencyKey = body.idempotencyKey?.trim();
+    if (!idempotencyKey || idempotencyKey.length > 120) {
+      throw new BadRequestException('Chave de idempotência obrigatória.');
+    }
+
+    const client = this.supabase.getUserClient(accessToken);
+    const existing = await client
+      .from('recargas_carteira')
+      .select('id, valor, metodo, status, referencia_provedor, checkout_url, criado_em')
+      .eq('usuario_id', user.sub)
+      .eq('chave_idempotencia', idempotencyKey)
+      .maybeSingle();
+
+    if (existing.error) throw new BadRequestException(existing.error.message);
+    if (existing.data) return { ...existing.data, reused: true };
+
+    const created = await client
+      .from('recargas_carteira')
+      .insert({
+        usuario_id: user.sub,
+        valor: amount.toFixed(2),
+        metodo: method,
+        status: 'PENDENTE',
+        chave_idempotencia: idempotencyKey,
+      })
+      .select('id, valor, metodo, status, referencia_provedor, checkout_url, criado_em')
+      .single();
+
+    if (created.error || !created.data) {
+      throw new BadRequestException(created.error?.message ?? 'Não foi possível criar a recarga.');
+    }
+    return { ...created.data, reused: false };
+  }
+
   async testTopUp(
     body: { amount?: number; method?: 'orangeMoney' | 'mtnMoney' },
     user: CurrentUserPayload,
