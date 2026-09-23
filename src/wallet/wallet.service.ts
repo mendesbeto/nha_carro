@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { CurrentUserPayload } from '../auth/current-user.decorator';
 import { SupabaseService } from '../supabase/supabase.service';
 
@@ -113,6 +113,150 @@ export class WalletService {
     }
 
     return { ...created.data, reused: false };
+  }
+
+  async handleWebhook(
+    provider: string,
+    secret: string | undefined,
+    body: {
+      eventId?: string;
+      topupId?: string;
+      providerReference?: string;
+      status?: 'CONFIRMED' | 'FAILED' | 'PENDING';
+      amount?: number | string;
+      payload?: unknown;
+    },
+  ) {
+    const configuredSecret = process.env.WALLET_WEBHOOK_SECRET?.trim();
+    if (!configuredSecret) {
+      throw new ServiceUnavailableException(
+        'Webhook de pagamento ainda não está configurado.',
+      );
+    }
+
+    if (!secret || secret !== configuredSecret) {
+      throw new UnauthorizedException('Webhook não autorizado.');
+    }
+
+    const normalizedProvider = provider.trim().toUpperCase().replace(/-/g, '_');
+    if (!['ORANGE_MONEY', 'MTN_MONEY'].includes(normalizedProvider)) {
+      throw new BadRequestException('Provedor de pagamento inválido.');
+    }
+
+    const status = body.status;
+    if (!status) {
+      throw new BadRequestException('Status do webhook obrigatório.');
+    }
+
+    const admin = this.supabase.getClient();
+    let query = admin
+      .from('recargas_carteira')
+      .select('id, usuario_id, valor, metodo, status, referencia_provedor')
+      .limit(1);
+
+    if (body.topupId?.trim()) {
+      query = query.eq('id', body.topupId.trim());
+    } else if (body.providerReference?.trim()) {
+      query = query.eq('referencia_provedor', body.providerReference.trim());
+    } else {
+      throw new BadRequestException(
+        'topupId ou providerReference é obrigatório.',
+      );
+    }
+
+    const lookup = await query.maybeSingle();
+    if (lookup.error) {
+      throw new BadRequestException(lookup.error.message);
+    }
+    if (!lookup.data) {
+      throw new BadRequestException('Recarga não encontrada.');
+    }
+
+    if (lookup.data.metodo !== normalizedProvider) {
+      throw new BadRequestException('Provedor incompatível com a recarga.');
+    }
+
+    if (status === 'PENDING') {
+      if (lookup.data.status === 'PENDENTE') {
+        await admin
+          .from('recargas_carteira')
+          .update({ status: 'PROCESSANDO' })
+          .eq('id', lookup.data.id)
+          .in('status', ['PENDENTE', 'PROCESSANDO']);
+      }
+      return {
+        accepted: true,
+        status: 'PROCESSANDO',
+        topupId: lookup.data.id,
+      };
+    }
+
+    if (status === 'FAILED') {
+      if (lookup.data.status !== 'CONFIRMADA') {
+        const failed = await admin
+          .from('recargas_carteira')
+          .update({
+            status: 'FALHOU',
+            referencia_provedor:
+              body.providerReference?.trim() ||
+              lookup.data.referencia_provedor ||
+              null,
+            resposta_provedor: body.payload ?? body,
+          })
+          .eq('id', lookup.data.id)
+          .in('status', ['PENDENTE', 'PROCESSANDO']);
+
+        if (failed.error) {
+          throw new BadRequestException(failed.error.message);
+        }
+      }
+
+      return {
+        accepted: true,
+        status: lookup.data.status === 'CONFIRMADA' ? 'CONFIRMADA' : 'FALHOU',
+        topupId: lookup.data.id,
+      };
+    }
+
+    const providerReference =
+      body.providerReference?.trim() || lookup.data.referencia_provedor?.trim();
+
+    if (!providerReference) {
+      throw new BadRequestException(
+        'providerReference é obrigatório para confirmar a recarga.',
+      );
+    }
+
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException(
+        'Valor confirmado pelo provedor é obrigatório.',
+      );
+    }
+
+    const confirmed = await admin.rpc('confirm_wallet_top_up', {
+      p_topup_id: lookup.data.id,
+      p_provider_reference: providerReference,
+      p_amount: amount,
+      p_provider_response: body.payload ?? body,
+    });
+
+    if (confirmed.error || !confirmed.data?.[0]) {
+      throw new BadRequestException(
+        confirmed.error?.message ?? 'Não foi possível confirmar a recarga.',
+      );
+    }
+
+    const result = confirmed.data[0];
+    return {
+      accepted: true,
+      topupId: result.topup_id,
+      status: result.status,
+      balance: result.balance,
+      transactionId: result.transaction_id,
+      alreadyConfirmed: result.already_confirmed,
+      eventId: body.eventId ?? null,
+    };
   }
 
   async testTopUp(
