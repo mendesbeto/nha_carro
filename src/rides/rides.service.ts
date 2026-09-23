@@ -113,6 +113,47 @@ export class RidesService {
     };
   }
 
+
+  async active(
+    user: CurrentUserPayload,
+    accessToken: string,
+  ) {
+    if (user.role !== 'driver') {
+      throw new ForbiddenException(
+        'Apenas motoristas podem consultar a corrida ativa.',
+      );
+    }
+
+    const client = this.supabase.getUserClient(accessToken);
+    const result = await client
+      .from('corridas')
+      .select('id, passageiro_id, motorista_id, status')
+      .eq('motorista_id', user.sub)
+      .in('status', ['ACEITA', 'EM_ANDAMENTO'])
+      .order('criado_em', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (result.error) {
+      throw new BadRequestException(
+        result.error.message ?? 'Não foi possível recuperar a corrida ativa.',
+      );
+    }
+
+    if (!result.data) {
+      return { ride: null };
+    }
+
+    return {
+      ride: {
+        rideId: result.data.id,
+        passageiroId: result.data.passageiro_id,
+        motoristaId: result.data.motorista_id,
+        status: result.data.status,
+      },
+    };
+  }
+
   async available(
     user: CurrentUserPayload,
     accessToken: string,
