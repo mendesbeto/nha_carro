@@ -101,7 +101,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     return message;
   }
 
-  Future<Position?> _getDriverPosition() async {
+  Future<Position> _getDriverPosition() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       throw Exception('Location services are disabled.');
@@ -187,9 +187,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Future<void> _sendCurrentLocation() async {
     if (!_online) return;
     try {
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      final position = await _getDriverPosition();
       if (!_online) return;
       await _api.setDriverAvailability(
         online: true,
