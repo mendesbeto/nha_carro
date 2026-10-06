@@ -41,6 +41,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   List<Map<String, dynamic>> _incomingRides = [];
   Map<String, dynamic>? _activeRide;
   bool _online = false;
+  bool _updatingAvailability = false;
   String _walletBalance = '—';
   Timer? _ridesPollingTimer;
   Timer? _locationUpdateTimer;
@@ -79,70 +80,91 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
   }
 
-  Future<void> _toggleOnline(bool value) async {
-    if (value) {
-      try {
-        final permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied ||
-            permission == LocationPermission.deniedForever) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Permita o acesso à localização para ficar online.'),
-            ),
-          );
-          return;
-        }
+  String _locationErrorMessage(Object error) {
+    final message = error.toString().replaceFirst('Exception: ', '').trim();
+    final normalized = message.toLowerCase();
 
-        final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
+    if (normalized.contains('location services are disabled') ||
+        normalized.contains('location service is disabled')) {
+      return 'A localização do dispositivo está desligada. Ative a localização e tente novamente.';
+    }
+    if (normalized.contains('permission') &&
+        (normalized.contains('denied') || normalized.contains('not granted'))) {
+      return 'O acesso à localização foi negado. Permita a localização nas definições do navegador/dispositivo.';
+    }
+    if (normalized.contains('timeout')) {
+      return 'Não foi possível obter a localização a tempo. Verifique o GPS/localização e tente novamente.';
+    }
+    if (message.isEmpty) {
+      return 'Não foi possível obter a localização do motorista.';
+    }
+    return message;
+  }
+
+  Future<Position> _getDriverPosition() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw Exception('Location services are disabled.');
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      throw Exception('Location permission denied.');
+    }
+
+    return Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+  }
+
+  Future<void> _toggleOnline(bool value) async {
+    if (_updatingAvailability) return;
+
+    setState(() => _updatingAvailability = true);
+
+    try {
+      if (value) {
+        final position = await _getDriverPosition();
 
         await _api.setDriverAvailability(
           online: true,
           latitude: position.latitude,
           longitude: position.longitude,
         );
-      } catch (error) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              error.toString().replaceFirst('Exception: ', ''),
-            ),
-          ),
-        );
-        return;
-      }
-    } else {
-      try {
+      } else {
         await _api.setDriverAvailability(online: false);
-      } catch (error) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              error.toString().replaceFirst('Exception: ', ''),
-            ),
-          ),
-        );
-        return;
       }
-    }
 
-    await _authService.saveDriverAvailability(value);
-    if (!mounted) return;
-    setState(() {
-      _online = value;
-      if (!value) _incomingRides = [];
-    });
-    if (value) {
-      await _loadAvailableRides();
-      _startRidesPolling();
-      _startLocationUpdates();
-    } else {
-      _stopRidesPolling();
-      _stopLocationUpdates();
+      await _authService.saveDriverAvailability(value);
+      if (!mounted) return;
+
+      setState(() {
+        _online = value;
+        if (!value) _incomingRides = [];
+      });
+
+      if (value) {
+        await _loadAvailableRides();
+        _startRidesPolling();
+        _startLocationUpdates();
+      } else {
+        _stopRidesPolling();
+        _stopLocationUpdates();
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_locationErrorMessage(error))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _updatingAvailability = false);
+      }
     }
   }
 
@@ -165,9 +187,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Future<void> _sendCurrentLocation() async {
     if (!_online) return;
     try {
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      final position = await _getDriverPosition();
       if (!_online) return;
       await _api.setDriverAvailability(
         online: true,
@@ -409,7 +429,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   ),
                   Switch(
                     value: _online,
-                    onChanged: _toggleOnline,
+                    onChanged: _updatingAvailability ? null : _toggleOnline,
                   ),
                 ],
               ),
