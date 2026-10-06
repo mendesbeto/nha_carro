@@ -234,6 +234,35 @@ export class RidesService {
       throw new ForbiddenException('Você não tem acesso a esta corrida.');
     }
 
+    let passageiro: {
+      id: string;
+      nome: string;
+      telefone: string;
+    } | null = null;
+
+    const serviceClient = this.supabase.getClient();
+    const passengerResult = await serviceClient
+      .from('usuarios')
+      .select('id, nome, telefone')
+      .eq('id', ride.passageiro_id)
+      .eq('tipo_perfil', 'PASSAGEIRO')
+      .maybeSingle();
+
+    if (passengerResult.error) {
+      throw new BadRequestException(
+        passengerResult.error.message ??
+          'Não foi possível carregar os dados do passageiro.',
+      );
+    }
+
+    if (passengerResult.data) {
+      passageiro = {
+        id: passengerResult.data.id,
+        nome: passengerResult.data.nome,
+        telefone: passengerResult.data.telefone,
+      };
+    }
+
     let motorista: {
       id: string;
       nome: string;
@@ -244,9 +273,8 @@ export class RidesService {
     } | null = null;
 
     if (ride.motorista_id) {
-      // Assemble passenger-facing driver data server-side so RLS does not
-      // need to expose driver profile/vehicle tables globally.
-      const serviceClient = this.supabase.getClient();
+      // Assemble driver data server-side so RLS does not need to expose
+      // driver profile/vehicle tables globally.
       const [driverResult, vehicleResult, locationResult] = await Promise.all([
         serviceClient
           .from('usuarios')
@@ -306,6 +334,7 @@ export class RidesService {
     return {
       rideId: ride.id,
       passageiroId: ride.passageiro_id,
+      passageiro,
       motoristaId: ride.motorista_id,
       motorista,
       origem: ride.origem_coords,
