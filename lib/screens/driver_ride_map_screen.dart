@@ -18,6 +18,9 @@ class _DriverRideMapScreenState extends State<DriverRideMapScreen> {
   static const LatLng _bissau = LatLng(11.8811, -15.6177);
 
   final ApiService _api = ApiService();
+  Set<Polyline> _polylines = <Polyline>{};
+  bool _routeLoading = false;
+  String? _routeMessage;
   Set<Marker> _markers = <Marker>{};
   Timer? _refreshTimer;
   GoogleMapController? _mapController;
@@ -70,6 +73,8 @@ class _DriverRideMapScreenState extends State<DriverRideMapScreen> {
     super.initState();
     _ride = Map<String, dynamic>.from(widget.ride);
     _refreshRide();
+    _loadRoadRoute();
+    _refreshRide();
     _refreshTimer = Timer.periodic(
       const Duration(seconds: 5),
       (_) => _refreshRide(),
@@ -80,6 +85,57 @@ class _DriverRideMapScreenState extends State<DriverRideMapScreen> {
   void dispose() {
     _refreshTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadRoadRoute() async {
+    if (_rideId.isEmpty || _routeLoading) return;
+    setState(() {
+      _routeLoading = true;
+      _routeMessage = null;
+    });
+    try {
+      final result = await _api.getRideRoute(_rideId);
+      final rawCoordinates = result['coordinates'];
+      if (rawCoordinates is! List) {
+        throw Exception('O serviço de rotas devolveu um formato inesperado.');
+      }
+      final points = <LatLng>[];
+      for (final raw in rawCoordinates) {
+        if (raw is! List || raw.length < 2) continue;
+        final longitude = num.tryParse(raw[0].toString());
+        final latitude = num.tryParse(raw[1].toString());
+        if (longitude == null || latitude == null ||
+            latitude < -90 || latitude > 90 ||
+            longitude < -180 || longitude > 180) {
+          continue;
+        }
+        points.add(LatLng(latitude.toDouble(), longitude.toDouble()));
+      }
+      if (points.length < 2) {
+        throw Exception('Não foi possível desenhar o percurso rodoviário.');
+      }
+      if (!mounted) return;
+      setState(() {
+        _polylines = {
+          Polyline(
+            polylineId: const PolylineId('road-route'),
+            points: points,
+            color: const Color(0xFF1565C0),
+            width: 6,
+            geodesic: false,
+          ),
+        };
+        _routeMessage = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _polylines = {};
+        _routeMessage = error.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => _routeLoading = false);
+    }
   }
 
   Future<void> _refreshRide() async {
@@ -181,6 +237,10 @@ class _DriverRideMapScreenState extends State<DriverRideMapScreen> {
         actions: [
           IconButton(
             tooltip: 'Atualizar mapa',
+            onPressed: () {
+              _refreshRide();
+              _loadRoadRoute();
+            },
             onPressed: _refreshRide,
             icon: const Icon(Icons.refresh),
           ),
@@ -208,6 +268,8 @@ class _DriverRideMapScreenState extends State<DriverRideMapScreen> {
                       _mapController = controller;
                       _rebuildMarkers();
                     },
+                    markers: _markers,
+                    polylines: _polylines,
                     markers: _markers,
                     myLocationButtonEnabled: false,
                     zoomControlsEnabled: true,
@@ -240,7 +302,11 @@ class _DriverRideMapScreenState extends State<DriverRideMapScreen> {
                           const Text('A acompanhar a localização a cada 5 segundos.'),
                           const SizedBox(height: 8),
                           Text(
-                            'Marcadores: motorista, recolha e destino. A linha de navegação pelas estradas depende da ativação do serviço Google Directions.',
+                            _routeLoading
+                                ? 'A calcular o percurso pelas estradas…'
+                                : _routeMessage == null
+                                    ? 'Percurso rodoviário apresentado a azul.'
+                                    : 'Os marcadores continuam disponíveis; rota: $_routeMessage',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                           if (_loading)
