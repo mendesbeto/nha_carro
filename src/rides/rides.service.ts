@@ -346,7 +346,7 @@ export class RidesService {
     };
     const route = data.routes?.[0];
     const coordinates = route?.geometry?.coordinates;
-    if (data.code !== 'Ok' || !Array.isArray(coordinates) || coordinates.length < 2) {
+    if (!route || data.code !== 'Ok' || !Array.isArray(coordinates) || coordinates.length < 2) {
       throw new BadRequestException(
         'Não foi encontrado um percurso rodoviário entre estes pontos.',
       );
