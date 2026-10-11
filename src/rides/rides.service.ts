@@ -127,7 +127,7 @@ export class RidesService {
     const client = this.supabase.getUserClient(accessToken);
     const result = await client
       .from('corridas')
-      .select('id, passageiro_id, motorista_id, status')
+      .select('id, passageiro_id, motorista_id, origem_coords, destino_coords, status')
       .eq('motorista_id', user.sub)
       .in('status', ['ACEITA', 'EM_ANDAMENTO'])
       .order('criado_em', { ascending: false })
@@ -149,6 +149,8 @@ export class RidesService {
         rideId: result.data.id,
         passageiroId: result.data.passageiro_id,
         motoristaId: result.data.motorista_id,
+        origem: result.data.origem_coords,
+        destino: result.data.destino_coords,
         status: result.data.status,
       },
     };
