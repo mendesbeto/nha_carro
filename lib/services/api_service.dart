@@ -262,6 +262,26 @@ class ApiService {
     return data;
   }
 
+  Future<Map<String, dynamic>> updateDriverLocation({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final response = await _authenticatedRequest(
+      () async => http.patch(
+        Uri.parse('$_baseUrl/rides/location'),
+        headers: await _headers(authenticated: true),
+        body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
+      ),
+    );
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(
+        data['message'] ?? data['error'] ?? 'Não foi possível atualizar a localização.',
+      );
+    }
+    return data;
+  }
+
   Future<Map<String, dynamic>?> getActiveRide() async {
     final response = await _authenticatedRequest(
       () async => http.get(
