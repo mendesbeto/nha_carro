@@ -330,6 +330,22 @@ class ApiService {
         .toList();
   }
 
+  Future<Map<String, dynamic>> getRideRoute(String rideId) async {
+    final response = await _authenticatedRequest(
+      () async => http.get(
+        Uri.parse('$_baseUrl/rides/${Uri.encodeComponent(rideId)}/route'),
+        headers: await _headers(authenticated: true),
+      ),
+    );
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(
+        data['message'] ?? data['error'] ?? 'Não foi possível calcular a rota.',
+      );
+    }
+    return data;
+  }
+
   Future<Map<String, dynamic>> getRide(String rideId) async {
     final response = await _authenticatedRequest(
       () async => http.get(
