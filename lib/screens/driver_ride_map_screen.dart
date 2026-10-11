@@ -84,10 +84,12 @@ class _DriverRideMapScreenState extends State<DriverRideMapScreen> {
 
   Future<void> _refreshRide() async {
     if (_rideId.isEmpty) {
-      if (mounted) setState(() {
-        _loading = false;
-        _error = 'Não foi possível identificar esta corrida.';
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = 'Não foi possível identificar esta corrida.';
+        });
+      }
       return;
     }
 
@@ -235,7 +237,7 @@ class _DriverRideMapScreenState extends State<DriverRideMapScreen> {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Text('A acompanhar a localização a cada 5 segundos.'),
+                          const Text('A acompanhar a localização a cada 5 segundos.'),
                           const SizedBox(height: 8),
                           Text(
                             'Marcadores: motorista, recolha e destino. A linha de navegação pelas estradas depende da ativação do serviço Google Directions.',
