@@ -57,6 +57,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       if (!mounted) return;
       setState(() => _online = savedStatus);
       await _loadWallet();
+
+      // Recover an accepted/in-progress ride even if the driver is currently offline.
+      // This keeps the active-ride card and its map available after a reload.
+      await _recoverActiveRide();
+
       if (savedStatus) {
         await _loadAvailableRides();
         _startRidesPolling();
@@ -214,8 +219,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       final activeRide = await _api.getActiveRide();
       if (!mounted) return;
       if (activeRide != null) {
+        final activeRideId = activeRide['rideId']?.toString();
+        final detailedRide = activeRideId != null && activeRideId.isNotEmpty
+            ? await _api.getRide(activeRideId)
+            : activeRide;
+        if (!mounted) return;
         setState(() {
-          _activeRide = activeRide;
+          _activeRide = detailedRide;
           _incomingRides = [];
         });
         return;
@@ -291,6 +301,26 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
 
+  Future<void> _recoverActiveRide() async {
+    try {
+      final activeRide = await _api.getActiveRide();
+      if (!mounted || activeRide == null) return;
+
+      final rideId = activeRide['rideId']?.toString();
+      final detailedRide = rideId != null && rideId.isNotEmpty
+          ? await _api.getRide(rideId)
+          : activeRide;
+      if (!mounted) return;
+
+      setState(() {
+        _activeRide = detailedRide;
+        _incomingRides = [];
+      });
+    } catch (_) {
+      // A temporary network error should not block access to the dashboard.
+    }
+  }
+
   Future<void> _openRideMap(Map<String, dynamic> ride) async {
     final rideId = ride['rideId']?.toString();
     if (rideId == null || rideId.isEmpty) {
@@ -300,9 +330,28 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       return;
     }
 
+    // Fetch the full ride payload before opening the map so the map receives
+    // the GeoJSON endpoints and the latest driver location.
+    Map<String, dynamic> rideForMap = ride;
+    try {
+      rideForMap = await _api.getRide(rideId);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Não foi possível atualizar os dados da corrida: '
+            '${error.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => DriverRideMapScreen(ride: ride),
+        builder: (_) => DriverRideMapScreen(ride: rideForMap),
       ),
     );
 
