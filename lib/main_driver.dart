@@ -148,13 +148,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       _startLocationUpdates();
     } else {
       _stopRidesPolling();
-      _stopLocationUpdates();
+      if (_activeRide != null) {
+        _startLocationUpdates();
+      } else {
+        _stopLocationUpdates();
+      }
     }
   }
 
   void _startLocationUpdates() {
     _stopLocationUpdates();
-    if (!_online) return;
+    if (!_online && _activeRide == null) return;
 
     _locationUpdateTimer = Timer.periodic(
       const Duration(seconds: 10),
@@ -169,17 +173,24 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _sendCurrentLocation() async {
-    if (!_online) return;
+    if (!_online && _activeRide == null) return;
     try {
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
       if (!_online) return;
-      await _api.setDriverAvailability(
-        online: true,
-        latitude: position.latitude,
-        longitude: position.longitude,
-      );
+      if (_activeRide != null) {
+        await _api.updateDriverLocation(
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+      } else if (_online) {
+        await _api.setDriverAvailability(
+          online: true,
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+      }
     } catch (_) {
       // A temporary location/network failure should not take the driver offline.
     }
@@ -271,6 +282,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         _incomingRides.removeWhere((item) => item['rideId']?.toString() == rideId);
       });
       _stopRidesPolling();
+      _startLocationUpdates();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Corrida aceita no servidor.')),
       );
@@ -316,6 +328,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         _activeRide = detailedRide;
         _incomingRides = [];
       });
+      _startLocationUpdates();
     } catch (_) {
       // A temporary network error should not block access to the dashboard.
     }
