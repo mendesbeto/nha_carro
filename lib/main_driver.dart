@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'screens/login_screen.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
+import 'screens/driver_ride_map_screen.dart';
 
 void main() {
   runApp(const NhaCarroDriverApp());
@@ -252,7 +253,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     if (rideId == null || rideId.isEmpty) return;
 
     try {
-      final accepted = await _api.acceptRide(rideId);
+      await _api.acceptRide(rideId);
+      final accepted = await _api.getRide(rideId);
       if (!mounted) return;
       setState(() {
         _activeRide = accepted;
@@ -276,7 +278,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final rideId = _activeRide?['rideId']?.toString();
     if (rideId == null || rideId.isEmpty) return;
     try {
-      final result = await _api.startRide(rideId);
+      await _api.startRide(rideId);
+      final result = await _api.getRide(rideId);
       if (!mounted) return;
       setState(() => _activeRide = result);
     } catch (error) {
@@ -284,6 +287,32 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
       );
+    }
+  }
+
+
+  Future<void> _openRideMap(Map<String, dynamic> ride) async {
+    final rideId = ride['rideId']?.toString();
+    if (rideId == null || rideId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível identificar a corrida para abrir o mapa.')),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DriverRideMapScreen(ride: ride),
+      ),
+    );
+
+    // Refresh the ride after returning from the map in case its status changed.
+    if (!mounted) return;
+    try {
+      final refreshed = await _api.getRide(rideId);
+      if (mounted) setState(() => _activeRide = refreshed);
+    } catch (_) {
+      // Keep the latest known ride data if the network is temporarily unavailable.
     }
   }
 
@@ -506,10 +535,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         child: _QuickActionButton(
                           icon: Icons.route_outlined,
                           label: 'Ver rota',
-                          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('A rota detalhada será exibida quando a localização do motorista estiver disponível.')),
-                          ),
+                          onPressed: _activeRide == null
+                              ? () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Aceite uma corrida para abrir o mapa do percurso.'),
+                                    ),
+                                  );
+                                }
+                              : () => _openRideMap(_activeRide!),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -543,6 +577,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text('ID: ${activeRide['rideId'] ?? '—'}'),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _openRideMap(activeRide),
+                        icon: const Icon(Icons.map_outlined),
+                        label: const Text('Ver mapa da corrida'),
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       'Estado: $_activeRideStatus',
