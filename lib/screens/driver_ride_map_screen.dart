@@ -241,7 +241,6 @@ class _DriverRideMapScreenState extends State<DriverRideMapScreen> {
               _refreshRide();
               _loadRoadRoute();
             },
-            onPressed: _refreshRide,
             icon: const Icon(Icons.refresh),
           ),
         ],
@@ -270,7 +269,6 @@ class _DriverRideMapScreenState extends State<DriverRideMapScreen> {
                     },
                     markers: _markers,
                     polylines: _polylines,
-                    markers: _markers,
                     myLocationButtonEnabled: false,
                     zoomControlsEnabled: true,
                     compassEnabled: true,
