@@ -642,7 +642,8 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
     }
     if (_destinationLocation == null) {
       await _pickDestinationOnMap();
-      if (!mounted || _destinationLocation == null) {
+      if (!mounted) return;
+      if (_destinationLocation == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Marque o destino no mapa antes de solicitar a corrida.')),
         );
