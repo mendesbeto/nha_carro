@@ -114,6 +114,79 @@ export class RidesService {
   }
 
 
+  async updateDriverLocation(
+    body: { latitude?: number; longitude?: number },
+    user: CurrentUserPayload,
+    accessToken: string,
+  ) {
+    if (user.role !== 'driver') {
+      throw new ForbiddenException('Apenas motoristas podem atualizar a localização.');
+    }
+    const { latitude, longitude } = body;
+    if (
+      typeof latitude !== 'number' ||
+      typeof longitude !== 'number' ||
+      latitude < -90 || latitude > 90 ||
+      longitude < -180 || longitude > 180
+    ) {
+      throw new BadRequestException('Coordenadas de localização inválidas.');
+    }
+
+    const client = this.supabase.getUserClient(accessToken);
+    const activeRide = await client
+      .from('corridas')
+      .select('id')
+      .eq('motorista_id', user.sub)
+      .in('status', ['ACEITA', 'EM_ANDAMENTO'])
+      .limit(1)
+      .maybeSingle();
+    if (activeRide.error) {
+      throw new BadRequestException('Não foi possível validar a corrida ativa.');
+    }
+    if (!activeRide.data) {
+      throw new ForbiddenException(
+        'A localização durante uma viagem só pode ser atualizada numa corrida ativa.',
+      );
+    }
+
+    const existing = await client
+      .from('posicoes_motoristas')
+      .select('motorista_id')
+      .eq('motorista_id', user.sub)
+      .maybeSingle();
+    if (existing.error) {
+      throw new BadRequestException(existing.error.message);
+    }
+
+    const payload = {
+      coordenadas: { type: 'Point', coordinates: [longitude, latitude] },
+      ultima_atualizacao: new Date().toISOString(),
+    };
+    const result = existing.data
+      ? await client
+          .from('posicoes_motoristas')
+          .update(payload)
+          .eq('motorista_id', user.sub)
+          .select('motorista_id, disponivel, ultima_atualizacao')
+          .single()
+      : await client
+          .from('posicoes_motoristas')
+          .insert({ motorista_id: user.sub, ...payload, disponivel: false })
+          .select('motorista_id, disponivel, ultima_atualizacao')
+          .single();
+
+    if (result.error || !result.data) {
+      throw new BadRequestException(
+        result.error?.message ?? 'Não foi possível guardar a localização do motorista.',
+      );
+    }
+    return {
+      motoristaId: result.data.motorista_id,
+      disponivel: result.data.disponivel,
+      ultimaAtualizacao: result.data.ultima_atualizacao,
+    };
+  }
+
   async active(
     user: CurrentUserPayload,
     accessToken: string,

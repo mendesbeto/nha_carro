@@ -20,6 +20,16 @@ import { RidesService } from './rides.service';
 export class RidesController {
   constructor(private readonly ridesService: RidesService) {}
 
+  @Patch('location')
+  @UseGuards(JwtAuthGuard)
+  updateDriverLocation(
+    @Body() body: { latitude?: number; longitude?: number },
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentAccessToken() accessToken: string,
+  ) {
+    return this.ridesService.updateDriverLocation(body, user, accessToken);
+  }
+
   @Get('active')
   @UseGuards(JwtAuthGuard)
   active(

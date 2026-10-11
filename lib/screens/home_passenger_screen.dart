@@ -28,6 +28,7 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
   final List<Map<String, dynamic>> _walletTransactions = [];
   GoogleMapController? _mapController;
   LatLng _currentLocation = const LatLng(11.8811, -15.6177);
+  LatLng? _destinationLocation;
   RideCategory _category = RideCategory.taxi;
   PaymentMethod _payment = PaymentMethod.cash;
   bool _loading = false;
@@ -580,6 +581,57 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
     }
   }
 
+  Future<void> _pickDestinationOnMap() async {
+    LatLng? selected = _destinationLocation;
+    final picked = await showDialog<LatLng>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, dialogSetState) => AlertDialog(
+          title: const Text('Marcar destino no mapa'),
+          content: SizedBox(
+            width: 560,
+            height: 420,
+            child: Column(
+              children: [
+                const Text('Toque no mapa para marcar o ponto exato de destino.'),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: selected ?? _currentLocation,
+                      zoom: 14,
+                    ),
+                    onTap: (point) => dialogSetState(() => selected = point),
+                    markers: {
+                      if (selected != null)
+                        Marker(
+                          markerId: const MarkerId('selected-destination'),
+                          position: selected!,
+                          infoWindow: const InfoWindow(title: 'Destino escolhido'),
+                          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+                        ),
+                    },
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: true,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancelar')),
+            FilledButton(
+              onPressed: selected == null ? null : () => Navigator.of(dialogContext).pop(selected),
+              child: const Text('Confirmar destino'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || picked == null) return;
+    setState(() => _destinationLocation = picked);
+  }
+
   Future<void> _requestRide() async {
     final destination = _destinationController.text.trim();
     if (destination.isEmpty) {
@@ -588,7 +640,16 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
       );
       return;
     }
-
+    if (_destinationLocation == null) {
+      await _pickDestinationOnMap();
+      if (!mounted) return;
+      if (_destinationLocation == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Marque o destino no mapa antes de solicitar a corrida.')),
+        );
+        return;
+      }
+    }
     setState(() => _loading = true);
 
     try {
@@ -598,6 +659,8 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
         paymentMethod: _payment,
         originLat: _currentLocation.latitude,
         originLng: _currentLocation.longitude,
+        destinationLat: _destinationLocation!.latitude,
+        destinationLng: _destinationLocation!.longitude,
       );
 
       if (!mounted) return;
@@ -1175,7 +1238,7 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
         TextField(
           controller: _destinationController,
           textInputAction: TextInputAction.search,
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => setState(() => _destinationLocation = null),
           onSubmitted: (_) {
             if (_destinationController.text.trim().isNotEmpty && !_loading) {
               _requestRide();
@@ -1213,7 +1276,13 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
                   ),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 6),
+        TextButton.icon(
+          onPressed: _pickDestinationOnMap,
+          icon: Icon(_destinationLocation == null ? Icons.add_location_alt_outlined : Icons.location_on),
+          label: Text(_destinationLocation == null ? 'Marcar destino no mapa' : 'Destino marcado no mapa'),
+        ),
+        const SizedBox(height: 8),
         const Text(
           'Locais frequentes',
           style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
