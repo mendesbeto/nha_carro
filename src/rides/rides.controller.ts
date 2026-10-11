@@ -59,6 +59,16 @@ export class RidesController {
     return this.ridesService.setDriverAvailability(body, user, accessToken);
   }
 
+  @Get(':rideId/route')
+  @UseGuards(JwtAuthGuard)
+  getRoadRoute(
+    @Param('rideId') rideId: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @CurrentAccessToken() accessToken: string,
+  ) {
+    return this.ridesService.getRoadRoute(rideId, user, accessToken);
+  }
+
   @Get(':rideId')
   @UseGuards(JwtAuthGuard)
   get(
