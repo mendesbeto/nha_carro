@@ -288,6 +288,79 @@ export class RidesService {
     };
   }
 
+  async getRoadRoute(
+    rideId: string,
+    user: CurrentUserPayload,
+    accessToken: string,
+  ) {
+    const ride = await this.get(rideId, user, accessToken);
+    const point = (raw: unknown): [number, number] | null => {
+      if (!raw || typeof raw !== 'object') return null;
+      const coordinates = (raw as { coordinates?: unknown }).coordinates;
+      if (!Array.isArray(coordinates) || coordinates.length < 2) return null;
+      const longitude = Number(coordinates[0]);
+      const latitude = Number(coordinates[1]);
+      if (
+        !Number.isFinite(longitude) ||
+        !Number.isFinite(latitude) ||
+        longitude < -180 || longitude > 180 ||
+        latitude < -90 || latitude > 90
+      ) return null;
+      return [longitude, latitude];
+    };
+
+    const origin = point(ride.origem);
+    const destination = point(ride.destino);
+    if (!origin || !destination) {
+      throw new BadRequestException('A partida ou o destino não tem coordenadas válidas.');
+    }
+
+    const url = new URL(
+      `https://router.project-osrm.org/route/v1/driving/${origin[0]},${origin[1]};${destination[0]},${destination[1]}`,
+    );
+    url.searchParams.set('overview', 'full');
+    url.searchParams.set('geometries', 'geojson');
+    url.searchParams.set('steps', 'false');
+
+    let response: Response;
+    try {
+      response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    } catch {
+      throw new InternalServerErrorException(
+        'O serviço de rotas está temporariamente indisponível.',
+      );
+    }
+    if (!response.ok) {
+      throw new InternalServerErrorException(
+        'Não foi possível calcular o percurso pelas estradas.',
+      );
+    }
+
+    const data = await response.json() as {
+      code?: string;
+      routes?: Array<{
+        distance?: number;
+        duration?: number;
+        geometry?: { type?: string; coordinates?: unknown };
+      }>;
+    };
+    const route = data.routes?.[0];
+    const coordinates = route?.geometry?.coordinates;
+    if (data.code !== 'Ok' || !Array.isArray(coordinates) || coordinates.length < 2) {
+      throw new BadRequestException(
+        'Não foi encontrado um percurso rodoviário entre estes pontos.',
+      );
+    }
+
+    return {
+      rideId,
+      provider: 'OpenStreetMap/OSRM',
+      coordinates,
+      distanceMeters: route.distance ?? null,
+      durationSeconds: route.duration ?? null,
+    };
+  }
+
   async get(
     rideId: string,
     user: CurrentUserPayload,
