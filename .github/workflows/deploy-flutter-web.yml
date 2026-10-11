@@ -56,7 +56,14 @@ jobs:
           PY
 
       - name: Build Flutter Web
-        run: flutter build web --release --base-href "/nha_carro/"
+        env:
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        run: |
+          if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
+            echo "::error::Repository secret GOOGLE_MAPS_API_KEY is missing."
+            exit 1
+          fi
+          flutter build web --release --base-href "/nha_carro/" --dart-define=GOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
