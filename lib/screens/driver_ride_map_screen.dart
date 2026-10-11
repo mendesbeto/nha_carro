@@ -18,7 +18,7 @@ class _DriverRideMapScreenState extends State<DriverRideMapScreen> {
   static const LatLng _bissau = LatLng(11.8811, -15.6177);
 
   final ApiService _api = ApiService();
-  final Set<Marker> _markers = {};
+  Set<Marker> _markers = <Marker>{};
   Timer? _refreshTimer;
   GoogleMapController? _mapController;
   Map<String, dynamic>? _ride;
@@ -65,9 +65,6 @@ class _DriverRideMapScreenState extends State<DriverRideMapScreen> {
   LatLng get _mapCenter =>
       _driverLocation ?? _origin ?? _destination ?? _bissau;
 
-  String get _targetLabel =>
-      _status == 'EM_ANDAMENTO' ? 'Destino da viagem' : 'Ponto de recolha';
-
   @override
   void initState() {
     super.initState();
@@ -82,7 +79,6 @@ class _DriverRideMapScreenState extends State<DriverRideMapScreen> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
-    _mapController?.dispose();
     super.dispose();
   }
 
@@ -124,9 +120,7 @@ class _DriverRideMapScreenState extends State<DriverRideMapScreen> {
   }
 
   void _rebuildMarkers() {
-    _markers
-      ..clear()
-      ..addAll([
+    _markers = {
         if (_origin != null)
           Marker(
             markerId: const MarkerId('pickup'),
@@ -154,7 +148,7 @@ class _DriverRideMapScreenState extends State<DriverRideMapScreen> {
               BitmapDescriptor.hueAzure,
             ),
           ),
-      ]);
+      };
   }
 
   Future<void> _centerOnDriver() async {
