@@ -35,6 +35,26 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
+      - name: Inject Google Maps API key
+        env:
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        run: |
+          if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
+            echo "::error::Repository secret GOOGLE_MAPS_API_KEY is missing."
+            exit 1
+          fi
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          path = Path("web/index.html")
+          content = path.read_text(encoding="utf-8")
+          placeholder = "__GOOGLE_MAPS_API_KEY__"
+          if content.count(placeholder) != 1:
+              raise SystemExit("Expected exactly one Google Maps key placeholder in web/index.html")
+          path.write_text(content.replace(placeholder, os.environ["GOOGLE_MAPS_API_KEY"]), encoding="utf-8")
+          PY
+
       - name: Build Flutter Web
         run: flutter build web --release --base-href "/nha_carro/"
 
