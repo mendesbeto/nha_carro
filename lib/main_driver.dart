@@ -382,9 +382,49 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _completeRide() async {
-    final rideId = _activeRide?['rideId']?.toString();
-    if (rideId == null || rideId.isEmpty) return;
+    final ride = _activeRide;
+    final rideId = ride?['rideId']?.toString();
+    if (rideId == null || rideId.isEmpty || ride == null) return;
+
+    final paymentMethod = ride['formaPagamento']?.toString().toUpperCase();
+    if (paymentMethod != 'DINHEIRO') {
+      final passenger = ride['passageiro'];
+      final passengerName = passenger is Map
+          ? (passenger['nome']?.toString().trim().isNotEmpty == true
+              ? passenger['nome'].toString()
+              : 'o passageiro')
+          : 'o passageiro';
+      final shouldCorrect = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Confirmar pagamento em dinheiro'),
+          content: Text(
+            'Esta corrida está registada com pagamento por '
+            '${_paymentMethodLabel(paymentMethod)}. Se $passengerName pagou em dinheiro, '
+            'corrija a forma de pagamento para poder concluir sem debitar a carteira.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Voltar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Corrigir para dinheiro'),
+            ),
+          ],
+        ),
+      );
+      if (shouldCorrect != true || !mounted) return;
+    }
+
     try {
+      if (paymentMethod != 'DINHEIRO') {
+        await _api.correctRidePaymentToCash(rideId);
+        final refreshed = await _api.getRide(rideId);
+        if (!mounted) return;
+        setState(() => _activeRide = refreshed);
+      }
       await _api.completeRide(rideId);
       if (!mounted) return;
       setState(() {
@@ -397,13 +437,36 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         _startRidesPolling();
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Corrida concluída e liquidação processada.')),
+        const SnackBar(content: Text('Corrida concluída. Pagamento em dinheiro registado.')),
       );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
       );
+      try {
+        final refreshed = await _api.getRide(rideId);
+        if (mounted) setState(() => _activeRide = refreshed);
+      } catch (_) {
+        // Preserve the current ride data if refresh fails.
+      }
+    }
+  }
+
+  String _paymentMethodLabel(String? method) {
+    switch (method) {
+      case 'DINHEIRO':
+        return 'dinheiro';
+      case 'ORANGE_MONEY':
+      case 'ORANGE_MONEY_WEB':
+        return 'Orange Money';
+      case 'MTN_MONEY':
+        return 'MTN Money';
+      case 'CARTEIRA':
+      case 'WALLET':
+        return 'carteira';
+      default:
+        return method?.isNotEmpty == true ? method! : 'a forma selecionada';
     }
   }
 
@@ -641,7 +704,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 8),
-                    Text('ID: ${activeRide['rideId'] ?? '—'}'),
+                    Text(
+                      'Passageiro: ${(activeRide['passageiro'] is Map &&
+                              (activeRide['passageiro'] as Map)['nome']?.toString().trim().isNotEmpty == true)
+                          ? (activeRide['passageiro'] as Map)['nome'].toString()
+                          : 'Nome indisponível'}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    if (activeRide['formaPagamento'] != null) ...[
+                      const SizedBox(height: 4),
+                      Text('Pagamento: ${_paymentMethodLabel(activeRide['formaPagamento']?.toString().toUpperCase())}'),
+                    ],
                     const SizedBox(height: 10),
                     SizedBox(
                       width: double.infinity,
