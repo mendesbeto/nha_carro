@@ -46,6 +46,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Timer? _ridesPollingTimer;
   Timer? _locationUpdateTimer;
   bool _loadingRides = false;
+  bool _sendingLocation = false;
+  String _locationStatus = 'A localização GPS ainda não foi enviada.';
 
 
 
@@ -173,10 +175,26 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Future<void> _sendCurrentLocation() async {
-    if (!_online && _activeRide == null) return;
+    if ((!_online && _activeRide == null) || _sendingLocation) return;
+    _sendingLocation = true;
     try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw Exception('O serviço de localização do dispositivo está desativado.');
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        throw Exception('Permissão GPS recusada. Autorize a localização nas definições do navegador.');
+      }
+
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 8),
       );
       // Keep location updates running during an active ride even if the driver
       // switched offline after accepting it. The backend allows location updates
@@ -194,8 +212,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           longitude: position.longitude,
         );
       }
-    } catch (_) {
-      // A temporary location/network failure should not take the driver offline.
+      if (!mounted) return;
+      final now = DateTime.now();
+      setState(() {
+        _locationStatus =
+            'GPS enviado às ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}.';
+      });
+    } catch (error) {
+      // Expose a useful diagnostic instead of silently hiding GPS/API failures.
+      if (!mounted) return;
+      setState(() {
+        _locationStatus = error.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      _sendingLocation = false;
     }
   }
 
@@ -509,7 +539,31 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  _locationStatus.startsWith('GPS enviado')
+                      ? Icons.gps_fixed
+                      : Icons.gps_not_fixed,
+                  color: _locationStatus.startsWith('GPS enviado')
+                      ? Colors.green
+                      : Colors.orange,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _locationStatus,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
           const Row(
             children: [
               Expanded(
