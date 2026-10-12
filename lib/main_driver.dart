@@ -178,7 +178,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
-      if (!_online) return;
+      // Keep location updates running during an active ride even if the driver
+      // switched offline after accepting it. The backend allows location updates
+      // for an active ride and must keep the driver's marker current on the map.
+      if (!_online && _activeRide == null) return;
       if (_activeRide != null) {
         await _api.updateDriverLocation(
           latitude: position.latitude,
