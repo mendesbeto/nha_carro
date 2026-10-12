@@ -99,6 +99,15 @@ export class RidesController {
     return this.ridesService.start(rideId, user, accessToken);
   }
 
+  @Patch(':rideId/payment-method/cash')
+  @UseGuards(JwtAuthGuard)
+  correctPaymentToCash(
+    @Param('rideId') rideId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.ridesService.correctPaymentToCash(rideId, user);
+  }
+
   @Patch(':rideId/complete')
   @UseGuards(JwtAuthGuard)
   complete(

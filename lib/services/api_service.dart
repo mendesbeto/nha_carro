@@ -368,6 +368,9 @@ class ApiService {
   Future<Map<String, dynamic>> startRide(String rideId) =>
       _rideAction('/rides/$rideId/start');
 
+  Future<Map<String, dynamic>> correctRidePaymentToCash(String rideId) =>
+      _rideAction('/rides/$rideId/payment-method/cash');
+
   Future<Map<String, dynamic>> completeRide(String rideId) =>
       _rideAction('/rides/$rideId/complete');
 

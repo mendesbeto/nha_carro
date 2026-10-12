@@ -523,6 +523,67 @@ export class RidesService {
     });
   }
 
+  async correctPaymentToCash(
+    rideId: string,
+    user: CurrentUserPayload,
+  ) {
+    if (user.role !== 'driver') {
+      throw new ForbiddenException(
+        'Apenas o motorista pode corrigir a forma de pagamento da corrida.',
+      );
+    }
+
+    // Use the service client only after verifying ownership and active status.
+    const client = this.supabase.getClient();
+    const current = await client
+      .from('corridas')
+      .select('id, motorista_id, status, forma_pagamento')
+      .eq('id', rideId)
+      .maybeSingle();
+
+    if (current.error || !current.data) {
+      throw new BadRequestException('Corrida não encontrada.');
+    }
+    if (current.data.motorista_id !== user.sub) {
+      throw new ForbiddenException('Motorista não autorizado para esta corrida.');
+    }
+    if (current.data.status !== 'EM_ANDAMENTO') {
+      throw new BadRequestException(
+        'Só é possível corrigir o pagamento de uma corrida em andamento.',
+      );
+    }
+    if (current.data.forma_pagamento === 'DINHEIRO') {
+      return {
+        rideId: current.data.id,
+        formaPagamento: 'DINHEIRO',
+        alreadyCash: true,
+      };
+    }
+
+    const updated = await client
+      .from('corridas')
+      .update({ forma_pagamento: 'DINHEIRO' })
+      .eq('id', rideId)
+      .eq('motorista_id', user.sub)
+      .eq('status', 'EM_ANDAMENTO')
+      .select('id, forma_pagamento, status')
+      .maybeSingle();
+
+    if (updated.error || !updated.data) {
+      throw new BadRequestException(
+        updated.error?.message ??
+          'Não foi possível corrigir a forma de pagamento. Atualize a corrida e tente novamente.',
+      );
+    }
+
+    return {
+      rideId: updated.data.id,
+      formaPagamento: updated.data.forma_pagamento,
+      status: updated.data.status,
+      alreadyCash: false,
+    };
+  }
+
   async complete(
     rideId: string,
     user: CurrentUserPayload,
