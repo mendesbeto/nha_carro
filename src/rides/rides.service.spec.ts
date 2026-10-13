@@ -127,8 +127,14 @@ describe('RidesService', () => {
 
   it('persists a ride with server-side fare, commission and payment mapping', async () => {
     const profile = queryChain({ data: { id: 'passenger-1' }, error: null });
+    const walletBalance = queryChain({ data: { saldo_carteira: 10000 }, error: null });
     const insert = queryChain({ data: { id: 'ride-1' }, error: null });
-    supabase.getUserClient.mockReturnValue({ from: jest.fn().mockReturnValueOnce(profile).mockReturnValueOnce(insert) });
+    supabase.getUserClient.mockReturnValue({
+      from: jest.fn()
+        .mockReturnValueOnce(profile)
+        .mockReturnValueOnce(walletBalance)
+        .mockReturnValueOnce(insert),
+    });
 
     const result = await service.request({
       destination: 'Centro',

@@ -733,6 +733,30 @@ export class RidesService {
     const category = dto.category ?? 'taxi';
     const paymentMethod = dto.paymentMethod ?? 'cash';
     const estimatedFare = FARES[category] ?? FARES.taxi;
+
+    // Fail early for wallet-funded electronic methods, not at ride completion.
+    // Cash rides never require wallet balance. Settlement still performs its
+    // authoritative balance check to protect against concurrent spending.
+    if (paymentMethod !== 'cash') {
+      const walletClient = this.supabase.getUserClient(accessToken);
+      const walletCheck = await walletClient
+        .from('usuarios')
+        .select('saldo_carteira')
+        .eq('id', user.sub)
+        .maybeSingle();
+
+      if (walletCheck.error || !walletCheck.data) {
+        throw new BadRequestException(
+          'Não foi possível verificar o saldo da carteira. Tente novamente.',
+        );
+      }
+
+      if (Number(walletCheck.data.saldo_carteira) < estimatedFare) {
+        throw new BadRequestException(
+          `Saldo insuficiente. A viagem custa ${estimatedFare} CFA e a sua carteira tem ${Number(walletCheck.data.saldo_carteira)} CFA. Escolha dinheiro ou carregue a carteira antes de solicitar.`,
+        );
+      }
+    }
     const response: {
       origin: string;
       destination: string;
