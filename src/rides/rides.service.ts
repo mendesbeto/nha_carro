@@ -738,7 +738,8 @@ export class RidesService {
     // Cash rides never require wallet balance. Settlement still performs its
     // authoritative balance check to protect against concurrent spending.
     if (paymentMethod !== 'cash') {
-      const walletCheck = await client
+      const walletClient = this.supabase.getUserClient(accessToken);
+      const walletCheck = await walletClient
         .from('usuarios')
         .select('saldo_carteira')
         .eq('id', user.sub)
