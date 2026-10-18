@@ -153,7 +153,7 @@ begin
     end if;
 
     return query
-      select v_ride.id, v_ride.status::text, true, v_ride.valor_total,
+      select v_ride.id, v_ride.status::text, false, v_ride.valor_total,
              v_driver_balance, null::uuid,
              case when v_debt_id is null
                then 'PAGAMENTO_EM_DINHEIRO_SEM_COMISSAO'
