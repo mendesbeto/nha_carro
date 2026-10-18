@@ -418,4 +418,63 @@ describe('WalletService', () => {
     supabase.getClient.mockReturnValue({ rpc });
     await expect(service.completeRideSettlement('ride-1', driver)).rejects.toBeInstanceOf(BadRequestException);
   });
+  it('returns the same pending commission debt details from the settlement RPC', async () => {
+    const rpc = jest.fn()
+      .mockResolvedValueOnce({
+        data: [{
+          ride_id: 'ride-cash-1',
+          status: 'CONCLUIDA',
+          settled: false,
+          amount: 2500,
+          balance: 1000,
+          transaction_id: null,
+          reason: 'PAGAMENTO_EM_DINHEIRO_DIVIDA_COMISSAO_PENDENTE',
+          commission: 500,
+          driver_credit: 0,
+          driver_balance: 1000,
+          driver_transaction_id: null,
+          commission_debt_id: 'debt-1',
+          commission_debt_status: 'PENDENTE',
+        }],
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: [{
+          ride_id: 'ride-cash-1',
+          status: 'CONCLUIDA',
+          settled: false,
+          amount: 2500,
+          balance: 1000,
+          transaction_id: null,
+          reason: 'PAGAMENTO_EM_DINHEIRO_DIVIDA_COMISSAO_JA_REGISTADA',
+          commission: 500,
+          driver_credit: 0,
+          driver_balance: 1000,
+          driver_transaction_id: null,
+          commission_debt_id: 'debt-1',
+          commission_debt_status: 'PENDENTE',
+        }],
+        error: null,
+      });
+    supabase.getClient.mockReturnValue({ rpc });
+
+    const first = await service.completeRideSettlement('ride-cash-1', driver);
+    const second = await service.completeRideSettlement('ride-cash-1', driver);
+
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc).toHaveBeenNthCalledWith(1, 'complete_ride_and_settle_wallet', {
+      p_ride_id: 'ride-cash-1',
+      p_actor_id: 'driver-1',
+    });
+    expect(first).toMatchObject({
+      settled: false,
+      commission: 500,
+      driverBalance: 1000,
+      commissionDebtId: 'debt-1',
+      commissionDebtStatus: 'PENDENTE',
+    });
+    expect(second.commissionDebtId).toBe(first.commissionDebtId);
+    expect(second.commissionDebtStatus).toBe('PENDENTE');
+  });
+
 });
