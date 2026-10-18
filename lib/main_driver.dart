@@ -455,7 +455,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         if (!mounted) return;
         setState(() => _activeRide = refreshed);
       }
-      await _api.completeRide(rideId);
+      final completion = await _api.completeRide(rideId);
       if (!mounted) return;
       setState(() {
         _activeRide = null;
@@ -466,8 +466,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         if (!mounted) return;
         _startRidesPolling();
       }
+      final debtStatus = completion['commissionDebtStatus']?.toString();
+      final commission = completion['commission'];
+      final message = debtStatus == 'PENDENTE'
+          ? 'Corrida concluída. Comissão de $commission CFA registada como dívida pendente; a carteira não foi debitada.'
+          : 'Corrida concluída. Pagamento em dinheiro registado.';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Corrida concluída. Pagamento em dinheiro registado.')),
+        SnackBar(content: Text(message)),
       );
     } catch (error) {
       if (!mounted) return;
