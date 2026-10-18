@@ -9,6 +9,7 @@ declare
   v_driver uuid := 'a0000000-0000-4000-8000-000000000002';
   v_cash_ride uuid := 'a0000000-0000-4000-8000-000000000011';
   v_digital_ride uuid := 'a0000000-0000-4000-8000-000000000012';
+  v_legacy_cash_ride uuid := 'a0000000-0000-4000-8000-000000000013';
   v_first record;
   v_second record;
   v_count integer;
@@ -32,7 +33,11 @@ begin
     (v_digital_ride, v_passenger, v_driver,
      public.st_setsrid(public.st_makepoint(-15.58, 11.86), 4326),
      public.st_setsrid(public.st_makepoint(-15.57, 11.87), 4326),
-     2500, 500, 'ORANGE_MONEY', 'EM_ANDAMENTO');
+     2500, 500, 'ORANGE_MONEY', 'EM_ANDAMENTO'),
+    (v_legacy_cash_ride, v_passenger, v_driver,
+     public.st_setsrid(public.st_makepoint(-15.58, 11.86), 4326),
+     public.st_setsrid(public.st_makepoint(-15.57, 11.87), 4326),
+     2500, 500, 'DINHEIRO', 'CONCLUIDA');
 
   select * into v_first
   from public.complete_ride_and_settle_wallet(v_cash_ride, v_driver);
@@ -95,6 +100,39 @@ begin
   );
   if v_count <> 2 then
     raise exception 'Esperava duas transações eletrónicas idempotentes; encontrei %.', v_count;
+  end if;
+
+  -- Simulate a legacy cash ride whose commission was already deducted
+  -- before migration 018. Retrying completion must not create a debt too.
+  update public.usuarios
+  set saldo_carteira = saldo_carteira - 500
+  where id = v_driver;
+
+  insert into public.transacoes_carteira
+    (usuario_id, valor, tipo, referencia_provedor)
+  values
+    (v_driver, -500, 'DEDUCAO_COMISSAO',
+     'RIDE:' || v_legacy_cash_ride::text || ':COMISSAO');
+
+  select * into v_first
+  from public.complete_ride_and_settle_wallet(v_legacy_cash_ride, v_driver);
+
+  if v_first.commission_debt_id is not null
+     or v_first.reason <> 'PAGAMENTO_EM_DINHEIRO_COMISSAO_JA_DEBITADA' then
+    raise exception 'Uma comissão já debitada antes da migração foi registada novamente como dívida.';
+  end if;
+
+  select count(*) into v_count
+  from public.dividas_comissao_motorista
+  where corrida_id = v_legacy_cash_ride;
+  if v_count <> 0 then
+    raise exception 'A corrida histórica com comissão já debitada não deveria gerar dívida.';
+  end if;
+
+  select saldo_carteira into v_driver_balance
+  from public.usuarios where id = v_driver;
+  if v_driver_balance <> 2500 then
+    raise exception 'A repetição da corrida histórica alterou a carteira após o débito legado: %.', v_driver_balance;
   end if;
 end
 $test$;
