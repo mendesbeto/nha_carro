@@ -334,6 +334,14 @@ export class WalletService {
     body: { amount?: number; method?: 'orangeMoney' | 'mtnMoney' },
     user: CurrentUserPayload,
   ) {
+    // Test credits change wallet balances directly, so they must never run
+    // in production even if WALLET_TEST_MODE is accidentally enabled.
+    if (process.env.NODE_ENV === 'production') {
+      throw new ServiceUnavailableException(
+        'Recarga de teste indisponível em produção.',
+      );
+    }
+
     if (process.env.WALLET_TEST_MODE !== 'true') {
       throw new ServiceUnavailableException(
         'Recarga de teste desativada. Use uma integração de pagamento real.',
