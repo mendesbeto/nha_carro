@@ -39,6 +39,11 @@ begin
   select * into v_second
   from public.complete_ride_and_settle_wallet(v_cash_ride, v_driver);
 
+  if v_first.settled is distinct from false
+     or v_second.settled is distinct from false then
+    raise exception 'Corrida em dinheiro não deve ser marcada como liquidação de carteira.';
+  end if;
+
   if v_first.commission_debt_id is null
      or v_first.commission_debt_status <> 'PENDENTE'
      or v_second.commission_debt_id <> v_first.commission_debt_id then
