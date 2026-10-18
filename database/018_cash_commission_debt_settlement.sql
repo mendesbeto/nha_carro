@@ -20,7 +20,7 @@ create unique index if not exists transacoes_carteira_tipo_referencia_uidx
   where referencia_provedor is not null;
 
 create table if not exists public.dividas_comissao_motorista (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   motorista_id uuid not null references public.usuarios(id),
   corrida_id uuid not null unique references public.corridas(id),
   valor numeric(10,2) not null check (valor > 0),
