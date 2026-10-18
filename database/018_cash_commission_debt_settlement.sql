@@ -76,6 +76,7 @@ declare
   v_driver_reference text;
   v_debt_id uuid;
   v_debt_status text;
+  v_existing_commission_transaction_id uuid;
   v_driver_role text;
   v_driver_status text;
   v_commission numeric;
@@ -130,6 +131,26 @@ begin
 
     if v_driver_balance is null then
       raise exception 'Carteira do motorista não encontrada.';
+    end if;
+
+    -- A retry of a ride completed before this migration must not create
+    -- a second obligation when its commission was already deducted by the
+    -- legacy cash-settlement function.
+    select t.id
+      into v_existing_commission_transaction_id
+    from public.transacoes_carteira t
+    where t.tipo = 'DEDUCAO_COMISSAO'
+      and t.referencia_provedor = v_reference || ':COMISSAO'
+    for update;
+
+    if v_existing_commission_transaction_id is not null then
+      return query
+        select v_ride.id, v_ride.status::text, false, v_ride.valor_total,
+               v_driver_balance, null::uuid,
+               'PAGAMENTO_EM_DINHEIRO_COMISSAO_JA_DEBITADA'::text,
+               v_commission, 0::numeric, v_driver_balance, null::uuid,
+               null::uuid, null::text;
+      return;
     end if;
 
     if v_commission > 0 then
