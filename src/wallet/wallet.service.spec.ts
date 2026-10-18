@@ -424,7 +424,7 @@ describe('WalletService', () => {
         data: [{
           ride_id: 'ride-cash-1',
           status: 'CONCLUIDA',
-          settled: true,
+          settled: false,
           amount: 2500,
           balance: 1000,
           transaction_id: null,
@@ -442,7 +442,7 @@ describe('WalletService', () => {
         data: [{
           ride_id: 'ride-cash-1',
           status: 'CONCLUIDA',
-          settled: true,
+          settled: false,
           amount: 2500,
           balance: 1000,
           transaction_id: null,
@@ -467,7 +467,7 @@ describe('WalletService', () => {
       p_actor_id: 'driver-1',
     });
     expect(first).toMatchObject({
-      settled: true,
+      settled: false,
       commission: 500,
       driverBalance: 1000,
       commissionDebtId: 'debt-1',
