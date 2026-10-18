@@ -23,10 +23,30 @@ describe('WalletService', () => {
   let service: WalletService;
   const paymentProviders = { get: jest.fn() };
 
+  const envKeys = [
+    'NODE_ENV',
+    'WALLET_TEST_MODE',
+    'WALLET_WEBHOOK_URL',
+    'WALLET_WEBHOOK_SECRET',
+  ] as const;
+  let originalEnv: Partial<Record<(typeof envKeys)[number], string | undefined>>;
+
   beforeEach(() => {
+    originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
     jest.clearAllMocks();
     supabase = { getUserClient: jest.fn(), getClient: jest.fn() };
     service = new WalletService(supabase as never, paymentProviders as never);
+  });
+
+  afterEach(() => {
+    for (const key of envKeys) {
+      const value = originalEnv[key];
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
   });
 
   it('loads wallet balance and transaction history for the authenticated user', async () => {
@@ -71,6 +91,64 @@ describe('WalletService', () => {
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
 
     expect(supabase.getClient).not.toHaveBeenCalled();
+  });
+
+  it('blocks test top-ups in production before calling the database even when test mode is enabled', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.WALLET_TEST_MODE = 'true';
+
+    await expect(
+      service.testTopUp({ amount: 1000, method: 'orangeMoney' }, passenger),
+    ).rejects.toMatchObject({
+      status: 503,
+      message: 'Recarga de teste indisponível em produção.',
+    });
+
+    expect(supabase.getClient).not.toHaveBeenCalled();
+  });
+
+  it('blocks test top-ups when test mode is disabled before calling the database', async () => {
+    process.env.NODE_ENV = 'test';
+    delete process.env.WALLET_TEST_MODE;
+
+    await expect(
+      service.testTopUp({ amount: 1000, method: 'orangeMoney' }, passenger),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+
+    expect(supabase.getClient).not.toHaveBeenCalled();
+  });
+
+  it('allows a mocked test top-up only outside production when test mode is enabled', async () => {
+    process.env.NODE_ENV = 'test';
+    process.env.WALLET_TEST_MODE = 'true';
+    const rpc = jest.fn().mockResolvedValue({
+      data: [{
+        balance: 1000,
+        amount: 1000,
+        type: 'RECARGA_ORANGE',
+        transaction_id: 'test-tx-1',
+        reference: 'test-ref-1',
+      }],
+      error: null,
+    });
+    supabase.getClient.mockReturnValue({ rpc });
+
+    await expect(
+      service.testTopUp({ amount: 1000, method: 'orangeMoney' }, passenger),
+    ).resolves.toEqual({
+      balance: 1000,
+      amount: 1000,
+      type: 'RECARGA_ORANGE',
+      transactionId: 'test-tx-1',
+      reference: 'test-ref-1',
+      testMode: true,
+    });
+
+    expect(rpc).toHaveBeenCalledWith('test_top_up_wallet', {
+      p_user_id: 'passenger-1',
+      p_amount: 1000,
+      p_type: 'RECARGA_ORANGE',
+    });
   });
 
   it('reuses an existing top-up for the same user and idempotency key', async () => {
