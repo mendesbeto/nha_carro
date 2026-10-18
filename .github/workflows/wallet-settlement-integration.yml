@@ -53,10 +53,11 @@ jobs:
           psql -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS private;"
           psql -v ON_ERROR_STOP=1 -c "CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS \\$\\$ SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid \\$\\$;"
           psql -v ON_ERROR_STOP=1 -c "CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS \\$\\$ SELECT coalesce(current_setting('request.jwt.claim.role', true), current_user) \\$\\$;"
-          psql -v ON_ERROR_STOP=1 -c "CREATE OR REPLACE FUNCTION private.my_role() RETURNS text LANGUAGE sql STABLE AS \\$\\$ SELECT coalesce((SELECT u.tipo_perfil::text FROM public.usuarios u WHERE u.id = auth.uid()), 'ANON') \\$\\$;" || true
 
       - name: Create base schema with PostGIS
-        run: psql -v ON_ERROR_STOP=1 -f database/001_initial_schema.sql
+        run: |
+          psql -v ON_ERROR_STOP=1 -f database/001_initial_schema.sql
+          psql -v ON_ERROR_STOP=1 -c "CREATE OR REPLACE FUNCTION private.my_role() RETURNS text LANGUAGE sql STABLE AS \\$\\$ SELECT coalesce((SELECT u.tipo_perfil::text FROM public.usuarios u WHERE u.id = auth.uid()), 'ANON') \\$\\$;"
 
       - name: Apply migrations 009 through 017 to ephemeral database only
         run: |
