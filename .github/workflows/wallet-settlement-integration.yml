@@ -1,0 +1,60 @@
+name: Isolated wallet settlement integration test
+
+on:
+  pull_request:
+    paths:
+      - "database/**"
+      - ".github/workflows/wallet-settlement-integration.yml"
+  push:
+    branches:
+      - "fix/cash-commission-debt-settlement"
+    paths:
+      - "database/**"
+      - ".github/workflows/wallet-settlement-integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wallet-settlement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: nhacarro_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nhacarro_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGDATABASE: nhacarro_test
+      PGUSER: postgres
+      PGPASSWORD: test-only-password
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create Supabase-compatible roles in isolated PostgreSQL
+        run: |
+          psql -v ON_ERROR_STOP=1 -c "CREATE ROLE anon NOLOGIN;"
+          psql -v ON_ERROR_STOP=1 -c "CREATE ROLE authenticated NOLOGIN;"
+          psql -v ON_ERROR_STOP=1 -c "CREATE ROLE service_role NOLOGIN BYPASSRLS;"
+
+      - name: Create base schema with PostGIS
+        run: psql -v ON_ERROR_STOP=1 -f database/001_initial_schema.sql
+
+      - name: Apply settlement migration to ephemeral database only
+        run: psql -v ON_ERROR_STOP=1 -f database/018_cash_commission_debt_settlement.sql
+
+      - name: Verify cash debt and electronic settlement idempotency
+        run: psql -v ON_ERROR_STOP=1 -f database/tests/018_cash_commission_debt_idempotency.sql
