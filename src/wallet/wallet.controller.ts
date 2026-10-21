@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Headers, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Headers, Param, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import {
   CurrentAccessToken,
@@ -24,6 +24,15 @@ export class WalletController {
   @UseGuards(JwtAuthGuard)
   getCommissionDebts(@CurrentUser() user: CurrentUserPayload) {
     return this.walletService.getCommissionDebts(user);
+  }
+
+  @Get('admin/users')
+  @UseGuards(JwtAuthGuard)
+  getAdminUsers(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query('profile') profile: string,
+  ) {
+    return this.walletService.getAdminUsers(user, profile);
   }
 
   @Get('admin/commission-debts')
