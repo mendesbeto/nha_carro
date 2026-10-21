@@ -43,6 +43,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Map<String, dynamic>? _activeRide;
   bool _online = false;
   String _walletBalance = '—';
+  String _commissionDebtTotal = '—';
+  List<Map<String, dynamic>> _commissionDebts = [];
+  bool _loadingCommissionDebts = true;
+  bool _commissionDebtsLoadFailed = false;
   Timer? _ridesPollingTimer;
   Timer? _locationUpdateTimer;
   bool _loadingRides = false;
@@ -59,6 +63,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       if (!mounted) return;
       setState(() => _online = savedStatus);
       await _loadWallet();
+      await _loadCommissionDebts();
 
       // Recover an accepted/in-progress ride even if the driver is currently offline.
       // This keeps the active-ride card and its map available after a reload.
@@ -251,6 +256,41 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       setState(() => _walletBalance = balance == null ? '—' : '$balance CFA');
     } catch (_) {
       // Keep the wallet unavailable rather than showing fabricated financial data.
+    }
+  }
+
+  Future<void> _loadCommissionDebts() async {
+    if (mounted) {
+      setState(() {
+        _loadingCommissionDebts = true;
+        _commissionDebtsLoadFailed = false;
+      });
+    }
+    try {
+      final result = await _api.getCommissionDebts();
+      if (!mounted) return;
+      final rawDebts = result['debts'];
+      final debts = rawDebts is List
+          ? rawDebts
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList()
+          : <Map<String, dynamic>>[];
+      final total = result['pendingTotal'];
+      final parsedTotal =
+          total is num ? total : num.tryParse('$total') ?? 0;
+      setState(() {
+        _commissionDebtTotal = '${parsedTotal.toStringAsFixed(0)} CFA';
+        _commissionDebts = debts;
+        _loadingCommissionDebts = false;
+        _commissionDebtsLoadFailed = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingCommissionDebts = false;
+        _commissionDebtsLoadFailed = true;
+      });
     }
   }
 
@@ -466,6 +506,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         if (!mounted) return;
         _startRidesPolling();
       }
+      await _loadCommissionDebts();
+      if (!mounted) return;
       final debtStatus = completion['commissionDebtStatus']?.toString();
       final commission = completion['commission'];
       final message = debtStatus == 'PENDENTE'
@@ -657,6 +699,62 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               trailing: Text(
                 _walletBalance,
                 style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Comissões pendentes',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _loadingCommissionDebts
+                        ? 'A carregar…'
+                        : _commissionDebtsLoadFailed
+                            ? 'Não foi possível carregar as dívidas.'
+                            : _commissionDebtTotal,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_loadingCommissionDebts)
+                    const LinearProgressIndicator()
+                  else if (_commissionDebtsLoadFailed)
+                    const Text('Verifique a ligação e tente novamente mais tarde.')
+                  else ...[
+                    if (_commissionDebts
+                        .where((debt) => debt['status'] == 'PENDENTE')
+                        .isEmpty)
+                      const Text('Nenhuma comissão pendente registada.')
+                    else
+                      ..._commissionDebts
+                          .where((debt) => debt['status'] == 'PENDENTE')
+                          .take(5)
+                          .map((debt) => ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Icon(Icons.receipt_long_outlined),
+                                title: Text(
+                                  'Corrida ${debt['corrida_id'] ?? '—'}',
+                                ),
+                                subtitle: const Text('Estado: PENDENTE'),
+                                trailing: Text(
+                                  '${debt['valor'] ?? '—'} CFA',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              )),
+                  ],
+                ],
               ),
             ),
           ),

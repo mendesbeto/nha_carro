@@ -1,4 +1,4 @@
-import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { WalletService } from './wallet.service';
 
 function queryChain(result: unknown) {
@@ -68,6 +68,40 @@ describe('WalletService', () => {
       expect.objectContaining({ id: 'tx-1', valor: -2500, tipo: 'PAGAMENTO_VIAGEM' }),
     ]);
     expect(result.balance).toBe(10000);
+  });
+
+  it('rejects commission debt queries from non-drivers', async () => {
+    await expect(service.getCommissionDebts(passenger)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(supabase.getClient).not.toHaveBeenCalled();
+  });
+
+  it('lists only the authenticated driver commission debts and totals pending amounts', async () => {
+    const debts = queryChain({
+      data: [
+        { id: 'debt-1', motorista_id: 'driver-1', valor: '500.00', status: 'PENDENTE' },
+        { id: 'debt-2', motorista_id: 'driver-1', valor: '200.00', status: 'PAGA' },
+      ],
+      error: null,
+    });
+    supabase.getClient.mockReturnValue({ from: jest.fn().mockReturnValue(debts) });
+
+    const result = await service.getCommissionDebts(driver);
+
+    expect(debts.eq).toHaveBeenCalledWith('motorista_id', 'driver-1');
+    expect(debts.order).toHaveBeenCalledWith('criado_em', { ascending: false });
+    expect(result.pendingTotal).toBe(500);
+    expect(result.debts).toHaveLength(2);
+  });
+
+  it('does not return fabricated commission debt totals when the database query fails', async () => {
+    const debts = queryChain({ data: null, error: { message: 'database unavailable' } });
+    supabase.getClient.mockReturnValue({ from: jest.fn().mockReturnValue(debts) });
+
+    await expect(service.getCommissionDebts(driver)).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
   });
 
   it('rejects wallet access when the profile cannot be loaded', async () => {

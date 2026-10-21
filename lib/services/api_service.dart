@@ -219,6 +219,25 @@ class ApiService {
     return data;
   }
 
+  Future<Map<String, dynamic>> getCommissionDebts() async {
+    final response = await _authenticatedRequest(
+      () async => http.get(
+        Uri.parse('$_baseUrl/wallet/commission-debts'),
+        headers: await _headers(authenticated: true),
+      ),
+    );
+
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(
+        data['message'] ??
+            data['error'] ??
+            'Não foi possível carregar as dívidas de comissão.',
+      );
+    }
+    return data;
+  }
+
   Future<Map<String, dynamic>> me() async {
     final response = await _authenticatedRequest(
       () async => http.get(
