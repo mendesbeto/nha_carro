@@ -238,6 +238,20 @@ class ApiService {
     return data;
   }
 
+  Future<Map<String, dynamic>> getAdminUsers(String profile) async {
+    final response = await _authenticatedRequest(
+      () async => http.get(
+        Uri.parse('$_baseUrl/wallet/admin/users?profile=$profile'),
+        headers: await _headers(authenticated: true),
+      ),
+    );
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(data['message'] ?? data['error'] ?? 'Não foi possível carregar os utilizadores.');
+    }
+    return data;
+  }
+
   Future<Map<String, dynamic>> getAdminCommissionDebts() async {
     final response = await _authenticatedRequest(
       () async => http.get(
