@@ -65,32 +65,11 @@ class _AdminScreenState extends State<AdminScreen> {
           value: '1.900 CFA'),
     ];
 
-    final drivers = [
-      const _DriverRow(
-          name: 'Mamadou S.', rating: '4.9', online: true, trips: '18'),
-      const _DriverRow(
-          name: 'Abdulai K.', rating: '4.8', online: true, trips: '14'),
-      const _DriverRow(
-          name: 'Soraia M.', rating: '4.7', online: false, trips: '9'),
-    ];
+    // Do not display fictitious driver accounts as production data.
+    final List<_DriverRow> drivers = [];
 
-    final passengers = [
-      const _PassengerRow(
-          name: 'Marta D.',
-          activity: '3 viagens hoje',
-          status: 'Ativo',
-          score: '4.7'),
-      const _PassengerRow(
-          name: 'João B.',
-          activity: '1 reclamação aberta',
-          status: 'Alerta',
-          score: '4.5'),
-      const _PassengerRow(
-          name: 'Aisha P.',
-          activity: 'Pagamento confirmado',
-          status: 'Ativo',
-          score: '4.9'),
-    ];
+    // Do not display fictitious passenger accounts as production data.
+    final List<_PassengerRow> passengers = [];
 
     final support = [
       const _SupportRow(title: 'Pagamento pendente', count: '5'),
@@ -281,17 +260,22 @@ class _AdminScreenState extends State<AdminScreen> {
                         children: [
                           const _SectionTitle(title: 'Motoristas'),
                           const SizedBox(height: 12),
-                          Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: Column(
-                                children: drivers
-                                    .map(
-                                        (driver) => _DriverTile(driver: driver))
-                                    .toList(),
+                          if (drivers.isEmpty)
+                            const Card(
+                              child: Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Text('A lista de motoristas reais ainda não está ligada à API. Nenhuma conta de demonstração é apresentada.'),
+                              ),
+                            )
+                          else
+                            Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(8),
+                                child: Column(
+                                  children: drivers.map((driver) => _DriverTile(driver: driver)).toList(),
+                                ),
                               ),
                             ),
-                          ),
                           const SizedBox(height: 16),
                           FilledButton.icon(
                             onPressed: () =>
@@ -311,17 +295,22 @@ class _AdminScreenState extends State<AdminScreen> {
                             children: [
                               const _SectionTitle(title: 'Clientes'),
                               const SizedBox(height: 12),
-                              Card(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8),
-                                  child: Column(
-                                    children: passengers
-                                        .map((passenger) => _PassengerTile(
-                                            passenger: passenger))
-                                        .toList(),
+                              if (passengers.isEmpty)
+                                const Card(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(16),
+                                    child: Text('A lista de clientes reais ainda não está ligada à API. Nenhuma conta de demonstração é apresentada.'),
+                                  ),
+                                )
+                              else
+                                Card(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Column(
+                                      children: passengers.map((passenger) => _PassengerTile(passenger: passenger)).toList(),
+                                    ),
                                   ),
                                 ),
-                              ),
                               const SizedBox(height: 16),
                               FilledButton.icon(
                                 onPressed: () =>
