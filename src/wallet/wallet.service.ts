@@ -71,6 +71,24 @@ export class WalletService {
     return { pendingTotal, debts };
   }
 
+  async getAdminUsers(user: CurrentUserPayload, profile: string) {
+    if (user.role !== 'admin') {
+      throw new ForbiddenException('Apenas administradores podem consultar utilizadores.');
+    }
+    if (!['MOTORISTA', 'PASSAGEIRO'].includes(profile)) {
+      throw new BadRequestException('Perfil de utilizador inválido.');
+    }
+    const result = await this.supabase.getClient()
+      .from('usuarios')
+      .select('id, nome, telefone, tipo_perfil, status_conta, avaliacao_media, criado_em')
+      .eq('tipo_perfil', profile)
+      .order('criado_em', { ascending: false });
+    if (result.error) {
+      throw new ServiceUnavailableException('Não foi possível carregar os utilizadores.');
+    }
+    return { users: result.data ?? [] };
+  }
+
   async getCommissionDebtsForAdmin(user: CurrentUserPayload) {
     if (user.role !== 'admin') {
       throw new ForbiddenException('Apenas administradores podem consultar todas as dívidas de comissão.');
