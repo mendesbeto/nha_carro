@@ -26,6 +26,19 @@ export class WalletController {
     return this.walletService.getCommissionDebts(user);
   }
 
+  @Post('commission-debts/settle')
+  @UseGuards(JwtAuthGuard)
+  settleCommissionDebt(
+    @Body() body: {
+      debtId?: string;
+      paymentMethod?: 'DINHEIRO' | 'TRANSFERENCIA' | 'OUTRO';
+      paymentReference?: string;
+    },
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.walletService.settleCommissionDebt(body, user);
+  }
+
   @Post('topup')
   @UseGuards(JwtAuthGuard)
   createTopUp(
