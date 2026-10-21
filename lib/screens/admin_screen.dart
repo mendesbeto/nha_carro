@@ -342,6 +342,8 @@ class _AdminScreenState extends State<AdminScreen> {
                                 children: [
                                   const _SectionTitle(title: 'Financeiro'),
                                   const SizedBox(height: 12),
+                                  const _CommissionDebtPanel(),
+                                  const SizedBox(height: 16),
                                   const Row(
                                     children: [
                                       Expanded(
@@ -877,6 +879,264 @@ class _ChartColumn extends StatelessWidget {
             Text(day,
                 style: const TextStyle(fontSize: 10, color: Colors.black54)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+
+class _CommissionDebtPanel extends StatefulWidget {
+  const _CommissionDebtPanel();
+
+  @override
+  State<_CommissionDebtPanel> createState() => _CommissionDebtPanelState();
+}
+
+class _CommissionDebtPanelState extends State<_CommissionDebtPanel> {
+  late Future<Map<String, dynamic>> _debtsFuture;
+  bool _settling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _debtsFuture = ApiService().getAdminCommissionDebts();
+  }
+
+  void _reload() {
+    setState(() {
+      _debtsFuture = ApiService().getAdminCommissionDebts();
+    });
+  }
+
+  Future<void> _confirmSettlement(Map<String, dynamic> debt) async {
+    final debtId = debt['id'] as String?;
+    if (debtId == null || _settling) return;
+
+    var paymentMethod = 'DINHEIRO';
+    final referenceController = TextEditingController();
+    final details = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Confirmar recebimento'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Comissão: ${debt['valor']} CFA'),
+              const SizedBox(height: 12),
+              const Text(
+                'Confirme apenas se o pagamento já foi efetivamente recebido.',
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: paymentMethod,
+                decoration: const InputDecoration(labelText: 'Método de pagamento'),
+                items: const [
+                  DropdownMenuItem(value: 'DINHEIRO', child: Text('Dinheiro')),
+                  DropdownMenuItem(value: 'TRANSFERENCIA', child: Text('Transferência')),
+                  DropdownMenuItem(value: 'OUTRO', child: Text('Outro')),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setDialogState(() => paymentMethod = value);
+                  }
+                },
+              ),
+              if (paymentMethod == 'TRANSFERENCIA') ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: referenceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Referência da transferência',
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final reference = referenceController.text.trim();
+                if (paymentMethod == 'TRANSFERENCIA' && reference.isEmpty) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Informe a referência da transferência.'),
+                    ),
+                  );
+                  return;
+                }
+                Navigator.of(dialogContext).pop({
+                  'method': paymentMethod,
+                  'reference': reference,
+                });
+              },
+              child: const Text('Confirmar recebimento'),
+            ),
+          ],
+        ),
+      ),
+    );
+    referenceController.dispose();
+
+    if (details == null || !mounted) return;
+
+    setState(() => _settling = true);
+    try {
+      final result = await ApiService().settleCommissionDebt(
+        debtId: debtId,
+        paymentMethod: details['method']!,
+        paymentReference: details['reference'],
+      );
+      if (!mounted) return;
+      final alreadyPaid = result['alreadyPaid'] == true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            alreadyPaid
+                ? 'Esta comissão já estava liquidada.'
+                : 'Pagamento de comissão registado com sucesso.',
+          ),
+        ),
+      );
+      _reload();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _settling = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: FutureBuilder<Map<String, dynamic>>(
+          future: _debtsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(18),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+
+            if (snapshot.hasError) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Comissões pendentes',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('Não foi possível carregar as dívidas.'),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: _reload,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Tentar novamente'),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            final data = snapshot.data ?? <String, dynamic>{};
+            final debts = (data['debts'] as List? ?? const [])
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .where((item) => item['status'] == 'PENDENTE')
+                .toList();
+            final total = double.tryParse('${data['pendingTotal']}') ?? 0;
+            final count = data['pendingCount'] as int? ?? debts.length;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Comissões pendentes',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _settling ? null : _reload,
+                      tooltip: 'Atualizar',
+                      icon: const Icon(Icons.refresh_rounded),
+                    ),
+                  ],
+                ),
+                Text(
+                  '${total.toStringAsFixed(0)} CFA por receber • $count dívida(s)',
+                  style: const TextStyle(
+                    color: Color(0xFFB45309),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (debts.isEmpty)
+                  const Text('Não existem comissões pendentes.')
+                else
+                  ...debts.take(10).map((debt) {
+                    final driver = debt['motorista'] is Map
+                        ? Map<String, dynamic>.from(debt['motorista'] as Map)
+                        : <String, dynamic>{};
+                    final driverName = driver['nome'] as String? ?? 'Motorista';
+                    final driverPhone = driver['telefone'] as String? ?? '';
+                    final amount = double.tryParse('${debt['valor']}') ?? 0;
+                    final rideId = debt['corrida_id'] as String? ?? '';
+                    return Column(
+                      children: [
+                        const Divider(height: 20),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const CircleAvatar(
+                            child: Icon(Icons.receipt_long_outlined),
+                          ),
+                          title: Text(driverName),
+                          subtitle: Text(
+                            '${amount.toStringAsFixed(0)} CFA • Corrida ${rideId.isEmpty ? '—' : rideId.substring(0, rideId.length > 8 ? 8 : rideId.length)}'
+                            '${driverPhone.isEmpty ? '' : '\n$driverPhone'}',
+                          ),
+                          isThreeLine: driverPhone.isNotEmpty,
+                          trailing: _settling
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : IconButton(
+                                  tooltip: 'Registar pagamento recebido',
+                                  onPressed: () => _confirmSettlement(debt),
+                                  icon: const Icon(
+                                    Icons.check_circle_outline,
+                                    color: Color(0xFF0B8F62),
+                                  ),
+                                ),
+                        ),
+                      ],
+                    );
+                  }),
+                if (debts.length > 10)
+                  Text('A mostrar 10 de ${debts.length} dívidas pendentes.'),
+              ],
+            );
+          },
         ),
       ),
     );
