@@ -104,6 +104,62 @@ describe('WalletService', () => {
     );
   });
 
+  it('rejects commission debt settlement from non-admin users', async () => {
+    await expect(
+      service.settleCommissionDebt(
+        { debtId: 'debt-1', paymentMethod: 'DINHEIRO' },
+        driver,
+      ),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(supabase.getClient).not.toHaveBeenCalled();
+  });
+
+  it('records an admin-confirmed commission payment through the idempotent RPC', async () => {
+    const rpc = jest.fn().mockResolvedValue({
+      data: [{
+        debt_id: 'debt-1',
+        status: 'PAGA',
+        amount: '500.00',
+        paid_at: '2026-10-21T20:00:00Z',
+        payment_method: 'DINHEIRO',
+        payment_reference: null,
+        paid_by: 'admin-1',
+        already_paid: false,
+      }],
+      error: null,
+    });
+    supabase.getClient.mockReturnValue({ rpc });
+
+    const result = await service.settleCommissionDebt(
+      { debtId: 'debt-1', paymentMethod: 'DINHEIRO' },
+      { sub: 'admin-1', email: 'admin@example.com', role: 'admin' },
+    );
+
+    expect(rpc).toHaveBeenCalledWith('settle_driver_commission_debt', {
+      p_debt_id: 'debt-1',
+      p_admin_id: 'admin-1',
+      p_payment_method: 'DINHEIRO',
+      p_payment_reference: null,
+    });
+    expect(result).toMatchObject({
+      debtId: 'debt-1',
+      status: 'PAGA',
+      amount: '500.00',
+      paymentMethod: 'DINHEIRO',
+      alreadyPaid: false,
+    });
+  });
+
+  it('requires a transfer reference before recording a commission payment', async () => {
+    await expect(
+      service.settleCommissionDebt(
+        { debtId: 'debt-1', paymentMethod: 'TRANSFERENCIA' },
+        { sub: 'admin-1', email: 'admin@example.com', role: 'admin' },
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(supabase.getClient).not.toHaveBeenCalled();
+  });
+
   it('rejects wallet access when the profile cannot be loaded', async () => {
     supabase.getUserClient.mockReturnValue({
       from: jest.fn().mockReturnValue(queryChain({ data: null, error: { message: 'not found' } })),

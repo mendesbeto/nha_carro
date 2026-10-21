@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PaymentProviderFactory } from './payment-provider.factory';
 import { CurrentUserPayload } from '../auth/current-user.decorator';
@@ -53,7 +53,7 @@ export class WalletService {
     const result = await this.supabase
       .getClient()
       .from('dividas_comissao_motorista')
-      .select('id, corrida_id, valor, status, referencia, criado_em, paga_em')
+      .select('id, corrida_id, valor, status, referencia, criado_em, paga_em, metodo_pagamento, referencia_pagamento')
       .eq('motorista_id', user.sub)
       .order('criado_em', { ascending: false });
 
@@ -69,6 +69,58 @@ export class WalletService {
       .reduce((sum, debt) => sum + Number(debt.valor), 0);
 
     return { pendingTotal, debts };
+  }
+
+  async settleCommissionDebt(
+    body: { debtId?: string; paymentMethod?: 'DINHEIRO' | 'TRANSFERENCIA' | 'OUTRO'; paymentReference?: string },
+    user: CurrentUserPayload,
+  ) {
+    if (user.role !== 'admin') {
+      throw new ForbiddenException('Apenas administradores podem confirmar pagamentos de comissão.');
+    }
+
+    const debtId = body.debtId?.trim();
+    if (!debtId) {
+      throw new BadRequestException('Identificador da dívida obrigatório.');
+    }
+
+    const paymentMethod = body.paymentMethod;
+    if (!paymentMethod || !['DINHEIRO', 'TRANSFERENCIA', 'OUTRO'].includes(paymentMethod)) {
+      throw new BadRequestException('Método de pagamento inválido.');
+    }
+
+    const paymentReference = body.paymentReference?.trim() || null;
+    if (paymentReference && paymentReference.length > 120) {
+      throw new BadRequestException('A referência do pagamento não pode exceder 120 caracteres.');
+    }
+    if (paymentMethod === 'TRANSFERENCIA' && !paymentReference) {
+      throw new BadRequestException('Informe a referência da transferência confirmada.');
+    }
+
+    const result = await this.supabase.getClient().rpc('settle_driver_commission_debt', {
+      p_debt_id: debtId,
+      p_admin_id: user.sub,
+      p_payment_method: paymentMethod,
+      p_payment_reference: paymentReference,
+    });
+
+    if (result.error || !result.data?.[0]) {
+      throw new BadRequestException(
+        result.error?.message ?? 'Não foi possível confirmar o pagamento da comissão.',
+      );
+    }
+
+    const settlement = result.data[0];
+    return {
+      debtId: settlement.debt_id,
+      status: settlement.status,
+      amount: settlement.amount,
+      paidAt: settlement.paid_at,
+      paymentMethod: settlement.payment_method,
+      paymentReference: settlement.payment_reference,
+      paidBy: settlement.paid_by,
+      alreadyPaid: settlement.already_paid,
+    };
   }
 
   async createTopUp(
