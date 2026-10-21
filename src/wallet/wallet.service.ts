@@ -43,6 +43,34 @@ export class WalletService {
     };
   }
 
+  async getCommissionDebts(user: CurrentUserPayload) {
+    if (user.role !== 'driver') {
+      throw new UnauthorizedException(
+        'Apenas motoristas podem consultar dívidas de comissão.',
+      );
+    }
+
+    const result = await this.supabase
+      .getClient()
+      .from('dividas_comissao_motorista')
+      .select('id, corrida_id, valor, status, referencia, criado_em, paga_em')
+      .eq('motorista_id', user.sub)
+      .order('criado_em', { ascending: false });
+
+    if (result.error) {
+      throw new ServiceUnavailableException(
+        'Não foi possível consultar as dívidas de comissão.',
+      );
+    }
+
+    const debts = result.data ?? [];
+    const pendingTotal = debts
+      .filter((debt) => debt.status === 'PENDENTE')
+      .reduce((sum, debt) => sum + Number(debt.valor), 0);
+
+    return { pendingTotal, debts };
+  }
+
   async createTopUp(
     body: { amount?: number; method?: 'orangeMoney' | 'mtnMoney'; idempotencyKey?: string },
     user: CurrentUserPayload,
