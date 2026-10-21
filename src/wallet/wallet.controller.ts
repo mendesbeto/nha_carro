@@ -20,6 +20,12 @@ export class WalletController {
     return this.walletService.getWallet(user, accessToken);
   }
 
+  @Get('commission-debts')
+  @UseGuards(JwtAuthGuard)
+  getCommissionDebts(@CurrentUser() user: CurrentUserPayload) {
+    return this.walletService.getCommissionDebts(user);
+  }
+
   @Post('topup')
   @UseGuards(JwtAuthGuard)
   createTopUp(
