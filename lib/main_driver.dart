@@ -507,6 +507,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         _startRidesPolling();
       }
       await _loadCommissionDebts();
+      if (!mounted) return;
       final debtStatus = completion['commissionDebtStatus']?.toString();
       final commission = completion['commission'];
       final message = debtStatus == 'PENDENTE'
