@@ -102,3 +102,31 @@ revoke all on function private.settle_driver_commission_debt(uuid, uuid, text, t
   from public, anon, authenticated;
 grant execute on function private.settle_driver_commission_debt(uuid, uuid, text, text)
   to service_role;
+
+create or replace function public.settle_driver_commission_debt(
+  p_debt_id uuid,
+  p_admin_id uuid,
+  p_payment_method text,
+  p_payment_reference text default null
+)
+returns table (
+  debt_id uuid,
+  status text,
+  amount numeric,
+  paid_at timestamptz,
+  payment_method text,
+  payment_reference text,
+  paid_by uuid,
+  already_paid boolean
+)
+language sql
+security definer
+set search_path = ''
+as $$
+  select * from private.settle_driver_commission_debt($1, $2, $3, $4);
+$$;
+
+revoke all on function public.settle_driver_commission_debt(uuid, uuid, text, text)
+  from public, anon, authenticated;
+grant execute on function public.settle_driver_commission_debt(uuid, uuid, text, text)
+  to service_role;
