@@ -65,11 +65,8 @@ class _AdminScreenState extends State<AdminScreen> {
           value: '1.900 CFA'),
     ];
 
-    // Do not display fictitious driver accounts as production data.
-    final List<_DriverRow> drivers = [];
-
-    // Do not display fictitious passenger accounts as production data.
-    final List<_PassengerRow> passengers = [];
+    final driversFuture = ApiService().getAdminUsers('MOTORISTA');
+    final passengersFuture = ApiService().getAdminUsers('PASSAGEIRO');
 
     final support = [
       const _SupportRow(title: 'Pagamento pendente', count: '5'),
@@ -260,22 +257,25 @@ class _AdminScreenState extends State<AdminScreen> {
                         children: [
                           const _SectionTitle(title: 'Motoristas'),
                           const SizedBox(height: 12),
-                          if (drivers.isEmpty)
-                            const Card(
-                              child: Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Text('A lista de motoristas reais ainda não está ligada à API. Nenhuma conta de demonstração é apresentada.'),
-                              ),
-                            )
-                          else
-                            Card(
-                              child: Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: Column(
-                                  children: drivers.map((driver) => _DriverTile(driver: driver)).toList(),
-                                ),
-                              ),
-                            ),
+                          FutureBuilder<Map<String, dynamic>>(
+                            future: driversFuture,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()));
+                              }
+                              if (snapshot.hasError) {
+                                return Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('Erro ao carregar motoristas: ${snapshot.error}')));
+                              }
+                              final users = (snapshot.data?['users'] as List? ?? const []).whereType<Map>().map((u) => Map<String, dynamic>.from(u)).toList();
+                              if (users.isEmpty) return const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Ainda não existem motoristas registados.')));
+                              return Card(child: Column(children: users.map((u) => ListTile(
+                                leading: const CircleAvatar(child: Icon(Icons.drive_eta_outlined)),
+                                title: Text((u['nome'] as String?)?.trim().isNotEmpty == true ? u['nome'] as String : 'Motorista sem nome'),
+                                subtitle: Text('${u['telefone'] ?? 'Sem telefone'} • ${u['status_conta'] ?? 'Estado desconhecido'}'),
+                                trailing: Text(u['avaliacao_media'] == null ? '—' : '${u['avaliacao_media']} ★'),
+                              )).toList()));
+                            },
+                          ),
                           const SizedBox(height: 16),
                           FilledButton.icon(
                             onPressed: () =>
@@ -295,22 +295,25 @@ class _AdminScreenState extends State<AdminScreen> {
                             children: [
                               const _SectionTitle(title: 'Clientes'),
                               const SizedBox(height: 12),
-                              if (passengers.isEmpty)
-                                const Card(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(16),
-                                    child: Text('A lista de clientes reais ainda não está ligada à API. Nenhuma conta de demonstração é apresentada.'),
-                                  ),
-                                )
-                              else
-                                Card(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(8),
-                                    child: Column(
-                                      children: passengers.map((passenger) => _PassengerTile(passenger: passenger)).toList(),
-                                    ),
-                                  ),
-                                ),
+                              FutureBuilder<Map<String, dynamic>>(
+                                future: passengersFuture,
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                    return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()));
+                                  }
+                                  if (snapshot.hasError) {
+                                    return Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('Erro ao carregar clientes: ${snapshot.error}')));
+                                  }
+                                  final users = (snapshot.data?['users'] as List? ?? const []).whereType<Map>().map((u) => Map<String, dynamic>.from(u)).toList();
+                                  if (users.isEmpty) return const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Ainda não existem clientes registados.')));
+                                  return Card(child: Column(children: users.map((u) => ListTile(
+                                    leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                                    title: Text((u['nome'] as String?)?.trim().isNotEmpty == true ? u['nome'] as String : 'Cliente sem nome'),
+                                    subtitle: Text('${u['telefone'] ?? 'Sem telefone'} • ${u['status_conta'] ?? 'Estado desconhecido'}'),
+                                    trailing: const Icon(Icons.verified_user_outlined),
+                                  )).toList()));
+                                },
+                              ),
                               const SizedBox(height: 16),
                               FilledButton.icon(
                                 onPressed: () =>
