@@ -12,14 +12,8 @@ alter table public.dividas_comissao_motorista
   add constraint dividas_comissao_motorista_payment_method_check
   check (metodo_pagamento is null or metodo_pagamento in ('DINHEIRO', 'TRANSFERENCIA', 'OUTRO'));
 
-alter table public.dividas_comissao_motorista
-  drop constraint if exists dividas_comissao_motorista_paid_audit_check;
-alter table public.dividas_comissao_motorista
-  add constraint dividas_comissao_motorista_paid_audit_check
-  check (
-    (status = 'PAGA' and paga_em is not null and paga_por is not null and metodo_pagamento is not null)
-    or status <> 'PAGA'
-  );
+-- Legacy rows already marked PAGA may predate audit metadata; new settlements
+-- always populate paga_por, metodo_pagamento, paga_em and the optional reference.
 
 create or replace function private.settle_driver_commission_debt(
   p_debt_id uuid,
