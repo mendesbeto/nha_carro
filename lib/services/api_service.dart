@@ -238,6 +238,54 @@ class ApiService {
     return data;
   }
 
+  Future<Map<String, dynamic>> getAdminCommissionDebts() async {
+    final response = await _authenticatedRequest(
+      () async => http.get(
+        Uri.parse('$_baseUrl/wallet/admin/commission-debts'),
+        headers: await _headers(authenticated: true),
+      ),
+    );
+
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(
+        data['message'] ??
+            data['error'] ??
+            'Não foi possível carregar as comissões pendentes.',
+      );
+    }
+    return data;
+  }
+
+  Future<Map<String, dynamic>> settleCommissionDebt({
+    required String debtId,
+    required String paymentMethod,
+    String? paymentReference,
+  }) async {
+    final response = await _authenticatedRequest(
+      () async => http.post(
+        Uri.parse('$_baseUrl/wallet/commission-debts/settle'),
+        headers: await _headers(authenticated: true),
+        body: jsonEncode({
+          'debtId': debtId,
+          'paymentMethod': paymentMethod,
+          if (paymentReference != null && paymentReference.trim().isNotEmpty)
+            'paymentReference': paymentReference.trim(),
+        }),
+      ),
+    );
+
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(
+        data['message'] ??
+            data['error'] ??
+            'Não foi possível confirmar o pagamento da comissão.',
+      );
+    }
+    return data;
+  }
+
   Future<Map<String, dynamic>> me() async {
     final response = await _authenticatedRequest(
       () async => http.get(

@@ -71,6 +71,35 @@ export class WalletService {
     return { pendingTotal, debts };
   }
 
+  async getCommissionDebtsForAdmin(user: CurrentUserPayload) {
+    if (user.role !== 'admin') {
+      throw new ForbiddenException('Apenas administradores podem consultar todas as dívidas de comissão.');
+    }
+
+    const result = await this.supabase
+      .getClient()
+      .from('dividas_comissao_motorista')
+      .select('id, motorista_id, corrida_id, valor, status, referencia, criado_em, paga_em, metodo_pagamento, referencia_pagamento, motorista:usuarios!dividas_comissao_motorista_motorista_id_fkey(nome, telefone)')
+      .order('criado_em', { ascending: false });
+
+    if (result.error) {
+      throw new ServiceUnavailableException(
+        'Não foi possível consultar as dívidas de comissão.',
+      );
+    }
+
+    const debts = result.data ?? [];
+    const pendingTotal = debts
+      .filter((debt) => debt.status === 'PENDENTE')
+      .reduce((sum, debt) => sum + Number(debt.valor), 0);
+
+    return {
+      pendingTotal,
+      pendingCount: debts.filter((debt) => debt.status === 'PENDENTE').length,
+      debts,
+    };
+  }
+
   async settleCommissionDebt(
     body: { debtId?: string; paymentMethod?: 'DINHEIRO' | 'TRANSFERENCIA' | 'OUTRO'; paymentReference?: string },
     user: CurrentUserPayload,

@@ -104,6 +104,35 @@ describe('WalletService', () => {
     );
   });
 
+  it('rejects admin commission debt list access from non-admin users', async () => {
+    await expect(service.getCommissionDebtsForAdmin(driver)).rejects.toMatchObject({
+      status: 403,
+    });
+    expect(supabase.getClient).not.toHaveBeenCalled();
+  });
+
+  it('returns pending commission debts and totals for an admin', async () => {
+    const debts = queryChain({
+      data: [
+        { id: 'debt-1', valor: '500.00', status: 'PENDENTE', motorista: { nome: 'Motorista A' } },
+        { id: 'debt-2', valor: '200.00', status: 'PAGA', motorista: { nome: 'Motorista B' } },
+      ],
+      error: null,
+    });
+    supabase.getClient.mockReturnValue({ from: jest.fn().mockReturnValue(debts) });
+
+    const result = await service.getCommissionDebtsForAdmin({
+      sub: 'admin-1',
+      email: 'admin@example.com',
+      role: 'admin',
+    });
+
+    expect(debts.order).toHaveBeenCalledWith('criado_em', { ascending: false });
+    expect(result.pendingTotal).toBe(500);
+    expect(result.pendingCount).toBe(1);
+    expect(result.debts).toHaveLength(2);
+  });
+
   it('rejects commission debt settlement from non-admin users', async () => {
     await expect(
       service.settleCommissionDebt(

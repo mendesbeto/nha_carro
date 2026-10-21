@@ -26,6 +26,12 @@ export class WalletController {
     return this.walletService.getCommissionDebts(user);
   }
 
+  @Get('admin/commission-debts')
+  @UseGuards(JwtAuthGuard)
+  getCommissionDebtsForAdmin(@CurrentUser() user: CurrentUserPayload) {
+    return this.walletService.getCommissionDebtsForAdmin(user);
+  }
+
   @Post('commission-debts/settle')
   @UseGuards(JwtAuthGuard)
   settleCommissionDebt(
