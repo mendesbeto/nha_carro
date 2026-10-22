@@ -65,11 +65,8 @@ class _AdminScreenState extends State<AdminScreen> {
           value: '1.900 CFA'),
     ];
 
-    // Do not display fictitious driver accounts as production data.
-    final List<_DriverRow> drivers = [];
-
-    // Do not display fictitious passenger accounts as production data.
-    final List<_PassengerRow> passengers = [];
+    final driversFuture = ApiService().getAdminUsers('MOTORISTA');
+    final passengersFuture = ApiService().getAdminUsers('PASSAGEIRO');
 
     final support = [
       const _SupportRow(title: 'Pagamento pendente', count: '5'),
@@ -260,22 +257,25 @@ class _AdminScreenState extends State<AdminScreen> {
                         children: [
                           const _SectionTitle(title: 'Motoristas'),
                           const SizedBox(height: 12),
-                          if (drivers.isEmpty)
-                            const Card(
-                              child: Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Text('A lista de motoristas reais ainda não está ligada à API. Nenhuma conta de demonstração é apresentada.'),
-                              ),
-                            )
-                          else
-                            Card(
-                              child: Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: Column(
-                                  children: drivers.map((driver) => _DriverTile(driver: driver)).toList(),
-                                ),
-                              ),
-                            ),
+                          FutureBuilder<Map<String, dynamic>>(
+                            future: driversFuture,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()));
+                              }
+                              if (snapshot.hasError) {
+                                return Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('Erro ao carregar motoristas: ${snapshot.error}')));
+                              }
+                              final users = (snapshot.data?['users'] as List? ?? const []).whereType<Map>().map((u) => Map<String, dynamic>.from(u)).toList();
+                              if (users.isEmpty) return const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Ainda não existem motoristas registados.')));
+                              return Card(child: Column(children: users.map((u) => ListTile(
+                                leading: const CircleAvatar(child: Icon(Icons.drive_eta_outlined)),
+                                title: Text((u['nome'] as String?)?.trim().isNotEmpty == true ? u['nome'] as String : 'Motorista sem nome'),
+                                subtitle: Text('${u['telefone'] ?? 'Sem telefone'} • ${u['status_conta'] ?? 'Estado desconhecido'}'),
+                                trailing: Text(u['avaliacao_media'] == null ? '—' : '${u['avaliacao_media']} ★'),
+                              )).toList()));
+                            },
+                          ),
                           const SizedBox(height: 16),
                           FilledButton.icon(
                             onPressed: () =>
@@ -295,22 +295,25 @@ class _AdminScreenState extends State<AdminScreen> {
                             children: [
                               const _SectionTitle(title: 'Clientes'),
                               const SizedBox(height: 12),
-                              if (passengers.isEmpty)
-                                const Card(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(16),
-                                    child: Text('A lista de clientes reais ainda não está ligada à API. Nenhuma conta de demonstração é apresentada.'),
-                                  ),
-                                )
-                              else
-                                Card(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(8),
-                                    child: Column(
-                                      children: passengers.map((passenger) => _PassengerTile(passenger: passenger)).toList(),
-                                    ),
-                                  ),
-                                ),
+                              FutureBuilder<Map<String, dynamic>>(
+                                future: passengersFuture,
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                    return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()));
+                                  }
+                                  if (snapshot.hasError) {
+                                    return Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('Erro ao carregar clientes: ${snapshot.error}')));
+                                  }
+                                  final users = (snapshot.data?['users'] as List? ?? const []).whereType<Map>().map((u) => Map<String, dynamic>.from(u)).toList();
+                                  if (users.isEmpty) return const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Ainda não existem clientes registados.')));
+                                  return Card(child: Column(children: users.map((u) => ListTile(
+                                    leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                                    title: Text((u['nome'] as String?)?.trim().isNotEmpty == true ? u['nome'] as String : 'Cliente sem nome'),
+                                    subtitle: Text('${u['telefone'] ?? 'Sem telefone'} • ${u['status_conta'] ?? 'Estado desconhecido'}'),
+                                    trailing: const Icon(Icons.verified_user_outlined),
+                                  )).toList()));
+                                },
+                              ),
                               const SizedBox(height: 16),
                               FilledButton.icon(
                                 onPressed: () =>
@@ -419,26 +422,9 @@ class _AdminScreenState extends State<AdminScreen> {
                                   const SizedBox(height: 12),
                                   const Card(
                                     child: Padding(
-                                      padding: EdgeInsets.all(8),
-                                      child: Column(
-                                        children: [
-                                          _PassengerTile(
-                                              passenger: _PassengerRow(
-                                            name: 'Marta D.',
-                                            activity:
-                                                'Pagamento pendente • 3 viagens',
-                                            status: 'Atenção',
-                                            score: '4.7',
-                                          )),
-                                          _PassengerTile(
-                                              passenger: _PassengerRow(
-                                            name: 'João B.',
-                                            activity:
-                                                'Reclamação aberta • 1 viagem',
-                                            status: 'Atenção',
-                                            score: '4.5',
-                                          )),
-                                        ],
+                                      padding: EdgeInsets.all(16),
+                                      child: Text(
+                                        'Os alertas reais de passageiros serão apresentados aqui quando estiverem ligados ao serviço de suporte.',
                                       ),
                                     ),
                                   ),
@@ -627,147 +613,11 @@ class _TripCard extends StatelessWidget {
   }
 }
 
-class _DriverRow {
-  const _DriverRow(
-      {required this.name,
-      required this.rating,
-      required this.online,
-      required this.trips});
-
-  final String name;
-  final String rating;
-  final bool online;
-  final String trips;
-}
-
-class _DriverTile extends StatelessWidget {
-  const _DriverTile({required this.driver});
-
-  final _DriverRow driver;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 20,
-            backgroundColor: Color(0xFFDDF5EA),
-            child: Icon(Icons.drive_eta_rounded, color: Color(0xFF0B8F62)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(driver.name,
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-                Text('Avaliação: ${driver.rating} • ${driver.trips} viagens',
-                    style:
-                        const TextStyle(color: Colors.black54, fontSize: 12)),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: driver.online
-                  ? const Color(0xFFE7F8F0)
-                  : const Color(0xFFF2F4F7),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              driver.online ? 'Online' : 'Offline',
-              style: TextStyle(
-                color: driver.online ? const Color(0xFF0B8F62) : Colors.black54,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SupportRow {
   const _SupportRow({required this.title, required this.count});
 
   final String title;
   final String count;
-}
-
-class _PassengerRow {
-  const _PassengerRow({
-    required this.name,
-    required this.activity,
-    required this.status,
-    required this.score,
-  });
-
-  final String name;
-  final String activity;
-  final String status;
-  final String score;
-}
-
-class _PassengerTile extends StatelessWidget {
-  const _PassengerTile({required this.passenger});
-
-  final _PassengerRow passenger;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 20,
-            backgroundColor: Color(0xFFDDF5EA),
-            child: Icon(Icons.person_outline, color: Color(0xFF0B8F62)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(passenger.name,
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-                Text(passenger.activity,
-                    style:
-                        const TextStyle(color: Colors.black54, fontSize: 12)),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(passenger.score,
-                  style: const TextStyle(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE7F8F0),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  passenger.status,
-                  style: const TextStyle(
-                      color: Color(0xFF0B8F62),
-                      fontWeight: FontWeight.w700,
-                      fontSize: 11),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _PaymentRow extends StatelessWidget {
