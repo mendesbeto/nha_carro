@@ -422,26 +422,9 @@ class _AdminScreenState extends State<AdminScreen> {
                                   const SizedBox(height: 12),
                                   const Card(
                                     child: Padding(
-                                      padding: EdgeInsets.all(8),
-                                      child: Column(
-                                        children: [
-                                          _PassengerTile(
-                                              passenger: _PassengerRow(
-                                            name: 'Marta D.',
-                                            activity:
-                                                'Pagamento pendente • 3 viagens',
-                                            status: 'Atenção',
-                                            score: '4.7',
-                                          )),
-                                          _PassengerTile(
-                                              passenger: _PassengerRow(
-                                            name: 'João B.',
-                                            activity:
-                                                'Reclamação aberta • 1 viagem',
-                                            status: 'Atenção',
-                                            score: '4.5',
-                                          )),
-                                        ],
+                                      padding: EdgeInsets.all(16),
+                                      child: Text(
+                                        'Os alertas reais de passageiros serão apresentados aqui quando estiverem ligados ao serviço de suporte.',
                                       ),
                                     ),
                                   ),
