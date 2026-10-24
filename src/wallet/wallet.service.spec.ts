@@ -304,6 +304,8 @@ describe('WalletService', () => {
         driver_credit: 2800,
         driver_balance: 7800,
         driver_transaction_id: 'tx-driver',
+        commission_debt_id: null,
+        commission_debt_status: null,
       }],
       error: null,
     });
@@ -321,6 +323,8 @@ describe('WalletService', () => {
       driverCredit: 2800,
       driverBalance: 7800,
       driverTransactionId: 'tx-driver',
+      commissionDebtId: null,
+      commissionDebtStatus: null,
     });
 
     expect(rpc).toHaveBeenCalledWith('complete_ride_and_settle_wallet', {
