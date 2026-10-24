@@ -104,14 +104,14 @@ class _AdminScreenState extends State<AdminScreen> {
                         future: passengersFuture,
                       ),
                       const SizedBox(height: 16),
-                      Card(
+                      const Card(
                         child: Padding(
-                          padding: const EdgeInsets.all(16),
+                          padding: EdgeInsets.all(16),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.info_outline_rounded),
-                              const SizedBox(width: 12),
+                              Icon(Icons.info_outline_rounded),
+                              SizedBox(width: 12),
                               Expanded(
                                 child: Text(
                                   'As estatísticas de viagens, receita, cancelamentos, avaliação e atividade semanal serão apresentadas quando existir uma ligação validada aos respetivos dados.',
