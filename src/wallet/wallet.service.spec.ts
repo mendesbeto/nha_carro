@@ -333,6 +333,38 @@ describe('WalletService', () => {
     });
   });
 
+  it('returns pending commission debt details for cash ride settlement', async () => {
+    const rpc = jest.fn().mockResolvedValue({
+      data: [{
+        ride_id: 'ride-cash-1',
+        status: 'CONCLUIDA',
+        settled: true,
+        amount: 2500,
+        balance: null,
+        transaction_id: null,
+        reason: 'DINHEIRO',
+        commission: 500,
+        driver_credit: 0,
+        driver_balance: null,
+        driver_transaction_id: null,
+        commission_debt_id: 'debt-1',
+        commission_debt_status: 'PENDENTE',
+      }],
+      error: null,
+    });
+    supabase.getClient.mockReturnValue({ rpc });
+
+    await expect(service.completeRideSettlement('ride-cash-1', driver)).resolves.toEqual(
+      expect.objectContaining({
+        rideId: 'ride-cash-1',
+        status: 'CONCLUIDA',
+        commission: 500,
+        commissionDebtId: 'debt-1',
+        commissionDebtStatus: 'PENDENTE',
+      }),
+    );
+  });
+
   it('converts database settlement errors into BadRequestException', async () => {
     const rpc = jest.fn().mockResolvedValue({ data: null, error: { message: 'Saldo insuficiente.' } });
     supabase.getClient.mockReturnValue({ rpc });
