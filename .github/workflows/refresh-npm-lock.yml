@@ -1,0 +1,48 @@
+name: Refresh vulnerable npm dependencies
+
+on:
+  push:
+    branches:
+      - fix/admin-remove-mock-dashboard-data
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/refresh-npm-lock.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Update to patched dependency versions and regenerate lockfile
+        run: |
+          npm pkg set 'overrides.multer=2.5.0' 'overrides.body-parser=2.4.0'
+          npm install --package-lock-only --ignore-scripts
+      - name: Commit npm-generated dependency lock
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- package.json package-lock.json; then
+            git add package.json package-lock.json
+            git commit -m "fix(security): update vulnerable npm dependencies [skip ci]"
+            git push
+          fi
+      - name: Install exactly from lockfile
+        run: npm ci
+      - name: Security audit of production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Build backend
+        run: npm run build
+      - name: Run backend tests
+        run: npm test -- --runInBand
