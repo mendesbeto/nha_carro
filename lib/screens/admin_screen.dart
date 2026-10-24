@@ -29,12 +29,6 @@ class _AdminScreenState extends State<AdminScreen> {
     final driversFuture = ApiService().getAdminUsers('MOTORISTA');
     final passengersFuture = ApiService().getAdminUsers('PASSAGEIRO');
 
-    final support = [
-      const _SupportRow(title: 'Pagamento pendente', count: '5'),
-      const _SupportRow(title: 'Motorista sem resposta', count: '2'),
-      const _SupportRow(title: 'Reclamações', count: '3'),
-    ];
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Painel Admin'),
@@ -242,7 +236,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                         'Os alertas e contadores de suporte ainda não estão ligados ao sistema de atendimento. Nenhum número fictício é apresentado.',
                                       ),
                                     ),
-                                  )
+                                  ),
                                   const SizedBox(height: 16),
                                   const _SectionTitle(
                                       title: 'Passageiros com atenção'),
