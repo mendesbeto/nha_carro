@@ -413,6 +413,8 @@ export class WalletService {
       driverCredit: settlement.driver_credit,
       driverBalance: settlement.driver_balance,
       driverTransactionId: settlement.driver_transaction_id,
+      commissionDebtId: settlement.commission_debt_id ?? null,
+      commissionDebtStatus: settlement.commission_debt_status ?? null,
     };
   }
 }
