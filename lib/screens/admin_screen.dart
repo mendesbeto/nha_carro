@@ -24,55 +24,10 @@ class _AdminScreenState extends State<AdminScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final stats = [
-      const _StatCard(
-          label: 'Viagens hoje',
-          value: '184',
-          trend: '+12%',
-          accent: Color(0xFF0B8F62)),
-      const _StatCard(
-          label: 'Receita',
-          value: '72.400 CFA',
-          trend: '+8.4%',
-          accent: Color(0xFF1F8FFF)),
-      const _StatCard(
-          label: 'Cancelamentos',
-          value: '9',
-          trend: '-3%',
-          accent: Color(0xFFE39A1E)),
-      const _StatCard(
-          label: 'Motoristas online',
-          value: '36',
-          trend: '+5',
-          accent: Color(0xFF7C4DFF)),
-    ];
 
-    final activeTrips = [
-      const _TripRow(
-          name: 'Aisha P.',
-          route: 'Aeroporto → Bandim',
-          status: 'Em viagem',
-          value: '3.500 CFA'),
-      const _TripRow(
-          name: 'Mário N.',
-          route: 'Mercado → Praia',
-          status: 'A recolher',
-          value: '2.800 CFA'),
-      const _TripRow(
-          name: 'Diana K.',
-          route: 'Casa → Centro',
-          status: 'Concluída',
-          value: '1.900 CFA'),
-    ];
 
     final driversFuture = ApiService().getAdminUsers('MOTORISTA');
     final passengersFuture = ApiService().getAdminUsers('PASSAGEIRO');
-
-    final support = [
-      const _SupportRow(title: 'Pagamento pendente', count: '5'),
-      const _SupportRow(title: 'Motorista sem resposta', count: '2'),
-      const _SupportRow(title: 'Reclamações', count: '3'),
-    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -80,7 +35,7 @@ class _AdminScreenState extends State<AdminScreen> {
         actions: [
           IconButton(
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Últimas notificações do sistema')),
+              const SnackBar(content: Text('As notificações ainda não estão ligadas ao sistema.')),
             ),
             icon: const Icon(Icons.notifications_none_rounded),
             tooltip: 'Notificações',
@@ -132,123 +87,40 @@ class _AdminScreenState extends State<AdminScreen> {
                       const Text('Resumo operacional',
                           style: TextStyle(
                               fontSize: 26, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Os indicadores de viagens, receita e atividade em tempo real ainda não estão ligados aos dados de produção. Para evitar números fictícios, o resumo apresenta apenas dados reais disponíveis.',
+                      ),
                       const SizedBox(height: 16),
-                      GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 1.4,
-                        children: stats,
+                      _AdminUserCountCard(
+                        title: 'Motoristas registados',
+                        icon: Icons.drive_eta_outlined,
+                        future: driversFuture,
                       ),
-                      const SizedBox(height: 20),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Row(
-                                children: [
-                                  Icon(Icons.bar_chart_rounded,
-                                      color: Color(0xFF0B8F62)),
-                                  SizedBox(width: 8),
-                                  Text('Atividade em tempo real',
-                                      style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w800)),
-                                ],
-                              ),
-                              const SizedBox(height: 14),
-                              const Text('Taxa de sucesso: 96.2%',
-                                  style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700)),
-                              const SizedBox(height: 8),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(999),
-                                child: const LinearProgressIndicator(
-                                  value: 0.962,
-                                  minHeight: 10,
-                                  backgroundColor: Color(0xFFE5E7EB),
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                      Color(0xFF0B8F62)),
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              const Row(
-                                children: [
-                                  Expanded(
-                                      child: _MiniMetric(
-                                          label: 'Tempo médio',
-                                          value: '11 min')),
-                                  SizedBox(width: 10),
-                                  Expanded(
-                                      child: _MiniMetric(
-                                          label: 'Avaliação', value: '4.8 ★')),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
+                      const SizedBox(height: 12),
+                      _AdminUserCountCard(
+                        title: 'Clientes registados',
+                        icon: Icons.people_outline_rounded,
+                        future: passengersFuture,
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       const Card(
                         child: Padding(
                           padding: EdgeInsets.all(16),
-                          child: Column(
+                          child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.insights_rounded,
-                                      color: Color(0xFF0B8F62)),
-                                  SizedBox(width: 8),
-                                  Text('Receita da semana',
-                                      style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w800)),
-                                ],
-                              ),
-                              SizedBox(height: 18),
-                              SizedBox(
-                                height: 160,
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    _ChartColumn(
-                                        day: 'Seg', value: 0.42, amount: '12k'),
-                                    _ChartColumn(
-                                        day: 'Ter', value: 0.66, amount: '18k'),
-                                    _ChartColumn(
-                                        day: 'Qua', value: 0.58, amount: '16k'),
-                                    _ChartColumn(
-                                        day: 'Qui', value: 0.84, amount: '25k'),
-                                    _ChartColumn(
-                                        day: 'Sex', value: 0.73, amount: '21k'),
-                                    _ChartColumn(
-                                        day: 'Sáb', value: 0.95, amount: '31k'),
-                                    _ChartColumn(
-                                        day: 'Dom', value: 0.69, amount: '20k'),
-                                  ],
+                              Icon(Icons.info_outline_rounded),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'As estatísticas de viagens, receita, cancelamentos, avaliação e atividade semanal serão apresentadas quando existir uma ligação validada aos respetivos dados.',
                                 ),
                               ),
                             ],
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          const Expanded(
-                              child: _SectionTitle(title: 'Viagens em curso')),
-                          TextButton(
-                              onPressed: () {}, child: const Text('Ver tudo')),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      ...activeTrips.map((trip) => _TripCard(trip: trip)),
                     ],
                   )
                 : _selectedTab == 1
@@ -278,14 +150,9 @@ class _AdminScreenState extends State<AdminScreen> {
                           ),
                           const SizedBox(height: 16),
                           FilledButton.icon(
-                            onPressed: () =>
-                                ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text(
-                                      'Nova revisão de desempenho foi agendada.')),
-                            ),
-                            icon: const Icon(Icons.sync_rounded),
-                            label: const Text('Sincronizar motoristas'),
+                            onPressed: () => setState(() {}),
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: const Text('Atualizar lista'),
                           ),
                         ],
                       )
@@ -316,12 +183,7 @@ class _AdminScreenState extends State<AdminScreen> {
                               ),
                               const SizedBox(height: 16),
                               FilledButton.icon(
-                                onPressed: () =>
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text(
-                                          'Lista de clientes foi atualizada.')),
-                                ),
+                                onPressed: () => setState(() {}),
                                 icon: const Icon(Icons.refresh_rounded),
                                 label: const Text('Atualizar clientes'),
                               ),
@@ -329,66 +191,34 @@ class _AdminScreenState extends State<AdminScreen> {
                           )
                         : _selectedTab == 3
                             ? ListView(
-                                padding:
-                                    const EdgeInsets.fromLTRB(20, 6, 20, 28),
+                                padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
                                 children: [
                                   const _SectionTitle(title: 'Financeiro'),
                                   const SizedBox(height: 12),
                                   const _CommissionDebtPanel(),
                                   const SizedBox(height: 16),
-                                  const Row(
-                                    children: [
-                                      Expanded(
-                                          child: _MiniMetric(
-                                              label: 'Lucro bruto',
-                                              value: '53.600 CFA')),
-                                      SizedBox(width: 10),
-                                      Expanded(
-                                          child: _MiniMetric(
-                                              label: 'Comissão',
-                                              value: '18.800 CFA')),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
                                   const Card(
                                     child: Padding(
                                       padding: EdgeInsets.all(16),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text('Distribuição por método',
-                                              style: TextStyle(
-                                                  fontSize: 18,
-                                                  fontWeight: FontWeight.w800)),
-                                          SizedBox(height: 16),
-                                          _PaymentRow(
-                                              label: 'Dinheiro',
-                                              value: '42%',
-                                              amount: '30.000 CFA'),
-                                          _PaymentRow(
-                                              label: 'Orange Money',
-                                              value: '35%',
-                                              amount: '25.000 CFA'),
-                                          _PaymentRow(
-                                              label: 'MTN Mobile',
-                                              value: '23%',
-                                              amount: '17.400 CFA'),
+                                          Icon(Icons.info_outline_rounded),
+                                          SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              'Os totais de receita, lucro e distribuição por método de pagamento ainda não estão ligados a uma fonte de dados validada. Os valores fictícios foram removidos.',
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 16),
+                                  const SizedBox(height: 12),
                                   FilledButton.icon(
-                                    onPressed: () =>
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                      const SnackBar(
-                                          content: Text(
-                                              'Relatório financeiro foi exportado.')),
-                                    ),
+                                    onPressed: null,
                                     icon: const Icon(Icons.download_rounded),
-                                    label: const Text('Exportar relatório'),
+                                    label: const Text('Exportação indisponível'),
                                   ),
                                 ],
                               )
@@ -399,21 +229,12 @@ class _AdminScreenState extends State<AdminScreen> {
                                   const _SectionTitle(
                                       title: 'Suporte e alertas'),
                                   const SizedBox(height: 12),
-                                  Card(
-                                    child: Column(
-                                      children: support
-                                          .map((item) => ListTile(
-                                                leading: const Icon(
-                                                    Icons
-                                                        .report_problem_outlined,
-                                                    color: Color(0xFFE39A1E)),
-                                                title: Text(item.title),
-                                                trailing: Text(item.count,
-                                                    style: const TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.w800)),
-                                              ))
-                                          .toList(),
+                                  const Card(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(16),
+                                      child: Text(
+                                        'Os alertas e contadores de suporte ainda não estão ligados ao sistema de atendimento. Nenhum número fictício é apresentado.',
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 16),
@@ -430,17 +251,10 @@ class _AdminScreenState extends State<AdminScreen> {
                                   ),
                                   const SizedBox(height: 16),
                                   FilledButton.icon(
-                                    onPressed: () =>
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                      const SnackBar(
-                                          content: Text(
-                                              'Equipe de suporte foi notificada.')),
-                                    ),
-                                    icon:
-                                        const Icon(Icons.support_agent_rounded),
-                                    label: const Text('Alertar suporte'),
-                                  ),
+                                    onPressed: null,
+                                    icon: const Icon(Icons.support_agent_rounded),
+                                    label: const Text('Alertas indisponíveis'),
+                                  )
                                 ],
                               ),
           ),
@@ -450,77 +264,42 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.trend,
-    required this.accent,
+
+class _AdminUserCountCard extends StatelessWidget {
+  const _AdminUserCountCard({
+    required this.title,
+    required this.icon,
+    required this.future,
   });
 
-  final String label;
-  final String value;
-  final String trend;
-  final Color accent;
+  final String title;
+  final IconData icon;
+  final Future<Map<String, dynamic>> future;
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(Icons.trending_up_rounded, color: accent, size: 18),
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: future,
+        builder: (context, snapshot) {
+          String value;
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            value = 'A carregar…';
+          } else if (snapshot.hasError) {
+            value = 'Indisponível';
+          } else {
+            final users = (snapshot.data?['users'] as List? ?? const []);
+            value = users.length.toString();
+          }
+          return ListTile(
+            leading: CircleAvatar(child: Icon(icon)),
+            title: Text(title),
+            trailing: Text(
+              value,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 12),
-            Text(label,
-                style: const TextStyle(color: Colors.black54, fontSize: 12)),
-            const SizedBox(height: 6),
-            Text(value,
-                style:
-                    const TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            Text(trend,
-                style: TextStyle(color: accent, fontWeight: FontWeight.w700)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniMetric extends StatelessWidget {
-  const _MiniMetric({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F9F7),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
-              style: const TextStyle(color: Colors.black54, fontSize: 12)),
-          const SizedBox(height: 6),
-          Text(value,
-              style:
-                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-        ],
+          );
+        },
       ),
     );
   }
@@ -537,193 +316,6 @@ class _SectionTitle extends StatelessWidget {
         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800));
   }
 }
-
-class _TripRow {
-  const _TripRow(
-      {required this.name,
-      required this.route,
-      required this.status,
-      required this.value});
-
-  final String name;
-  final String route;
-  final String status;
-  final String value;
-}
-
-class _TripCard extends StatelessWidget {
-  const _TripCard({required this.trip});
-
-  final _TripRow trip;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            const CircleAvatar(
-              radius: 20,
-              backgroundColor: Color(0xFFDDF5EA),
-              child: Icon(Icons.person, color: Color(0xFF0B8F62)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(trip.name,
-                      style: const TextStyle(fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 2),
-                  Text(trip.route,
-                      style:
-                          const TextStyle(color: Colors.black54, fontSize: 12)),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE7F8F0),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    trip.status,
-                    style: const TextStyle(
-                        color: Color(0xFF0B8F62),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(trip.value,
-                    style: const TextStyle(fontWeight: FontWeight.w800)),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SupportRow {
-  const _SupportRow({required this.title, required this.count});
-
-  final String title;
-  final String count;
-}
-
-class _PaymentRow extends StatelessWidget {
-  const _PaymentRow({
-    required this.label,
-    required this.value,
-    required this.amount,
-  });
-
-  final String label;
-  final String value;
-  final String amount;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: double.parse(value.replaceAll('%', '')) / 100,
-                    minHeight: 8,
-                    backgroundColor: const Color(0xFFE5E7EB),
-                    valueColor:
-                        const AlwaysStoppedAnimation<Color>(Color(0xFF0B8F62)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          SizedBox(
-            width: 90,
-            child: Text(
-              amount,
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(value,
-              style: const TextStyle(
-                  color: Colors.black54, fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
-}
-
-class _ChartColumn extends StatelessWidget {
-  const _ChartColumn({
-    required this.day,
-    required this.value,
-    required this.amount,
-  });
-
-  final String day;
-  final double value;
-  final String amount;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Column(
-          children: [
-            Text(amount,
-                style:
-                    const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Expanded(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: FractionallySizedBox(
-                  widthFactor: 0.9,
-                  heightFactor: value,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF0B8F62),
-                      borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(10)),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(day,
-                style: const TextStyle(fontSize: 10, color: Colors.black54)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 
 class _CommissionDebtPanel extends StatefulWidget {
   const _CommissionDebtPanel();
