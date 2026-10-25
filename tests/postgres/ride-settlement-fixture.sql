@@ -48,6 +48,20 @@ CREATE TABLE public.dividas_comissao_motorista (
   criado_em timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Test-only delay makes the competing session reliably wait on the ride row lock.
+CREATE OR REPLACE FUNCTION public.test_pause_on_ride_completion()
+RETURNS trigger LANGUAGE plpgsql AS $trigger$
+BEGIN
+  IF OLD.status IS DISTINCT FROM NEW.status AND NEW.status = 'CONCLUIDA' THEN
+    PERFORM pg_sleep(0.8);
+  END IF;
+  RETURN NEW;
+END;
+$trigger$;
+CREATE TRIGGER test_pause_on_ride_completion
+BEFORE UPDATE OF status ON public.corridas
+FOR EACH ROW EXECUTE FUNCTION public.test_pause_on_ride_completion();
+
 CREATE SCHEMA IF NOT EXISTS private;
 
 -- Function body copied from the read-only production definition on 2026-10-25.
