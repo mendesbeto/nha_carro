@@ -95,7 +95,7 @@ declare
 begin
   perform set_config('request.jwt.claim.sub', p_actor_id::text, true);
 
-  select u.tipo_perfil, u.status_conta
+  select u.tipo_perfil::text, u.status_conta::text
     into v_driver_role, v_driver_status
   from public.usuarios u
   where u.id = p_actor_id;
