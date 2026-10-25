@@ -125,21 +125,19 @@ describe('RidesService', () => {
     await expect(service.cancel('ride-1', driver, token)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('persists a ride with server-side fare, commission and payment mapping', async () => {
+  it('persists a cash ride with server-side fare and commission', async () => {
     const profile = queryChain({ data: { id: 'passenger-1' }, error: null });
-    const walletBalance = queryChain({ data: { saldo_carteira: 10000 }, error: null });
     const insert = queryChain({ data: { id: 'ride-1' }, error: null });
     supabase.getUserClient.mockReturnValue({
       from: jest.fn()
         .mockReturnValueOnce(profile)
-        .mockReturnValueOnce(walletBalance)
         .mockReturnValueOnce(insert),
     });
 
     const result = await service.request({
       destination: 'Centro',
       category: 'confort',
-      paymentMethod: 'orangeMoney',
+      paymentMethod: 'cash',
       originLat: 12.3,
       originLng: -15.4,
       destinationLat: 12.4,
@@ -150,11 +148,30 @@ describe('RidesService', () => {
       passageiro_id: 'passenger-1',
       valor_total: 3500,
       valor_comissao: 700,
-      forma_pagamento: 'ORANGE_MONEY',
+      forma_pagamento: 'DINHEIRO',
       status: 'SOLICITADA',
     }));
     expect(result).toMatchObject({ rideId: 'ride-1', persisted: true, estimatedFare: 3500 });
   });
+
+  it.each(['orangeMoney', 'mtnMoney'])(
+    'rejects the unintegrated electronic ride payment method %s before any database call',
+    async (paymentMethod) => {
+      await expect(service.request({
+        destination: 'Centro',
+        category: 'taxi',
+        paymentMethod,
+        originLat: 12.3,
+        originLng: -15.4,
+        destinationLat: 12.4,
+        destinationLng: -15.5,
+      }, passenger, token)).rejects.toThrow(
+        'Pagamento eletrónico indisponível para corridas. Por enquanto, escolha dinheiro.',
+      );
+
+      expect(supabase.getUserClient).not.toHaveBeenCalled();
+    },
+  );
 
   it('requires both destination coordinates together', async () => {
     await expect(service.request({
