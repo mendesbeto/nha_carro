@@ -4,7 +4,7 @@ set -euo pipefail
 : "${PGHOST:=127.0.0.1}"
 : "${PGPORT:=5432}"
 : "${PGUSER:=postgres}"
-: "${PGPASSWORD:=postgres}"
+: "${PGPASSWORD:?PGPASSWORD must be supplied by CI}"
 : "${PGDATABASE:=nhacarro_test}"
 export PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE
 PSQL=(psql -X -v ON_ERROR_STOP=1 -q)
