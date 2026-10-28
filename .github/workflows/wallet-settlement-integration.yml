@@ -91,3 +91,6 @@ jobs:
 
       - name: Verify cash debt and wallet settlement idempotency
         run: psql -v ON_ERROR_STOP=1 -f database/tests/018_cash_commission_debt_idempotency.sql
+
+      - name: Verify concurrency against the actual migrated settlement functions
+        run: bash tests/postgres/ride-settlement-migrations-concurrency.sh
