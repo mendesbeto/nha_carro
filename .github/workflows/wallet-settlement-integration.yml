@@ -53,7 +53,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS private;"
           psql -v ON_ERROR_STOP=1 <<'SQL'
           CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-          CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT coalesce(current_setting('request.jwt.claim.role', true), current_user) $;
+          CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT coalesce(current_setting('request.jwt.claim.role', true), current_user) $$;
           SQL
 
       - name: Create base schema with PostGIS
