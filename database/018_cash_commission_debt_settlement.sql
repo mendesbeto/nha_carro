@@ -112,6 +112,10 @@ begin
     raise exception 'A corrida precisa estar em andamento para ser concluída.';
   end if;
 
+  if v_ride.forma_pagamento::text not in ('DINHEIRO', 'CARTEIRA') then
+    raise exception 'Método de pagamento eletrónico sem confirmação do provedor; liquidação bloqueada.';
+  end if;
+
   if v_ride.status = 'EM_ANDAMENTO' then
     update public.corridas
     set status = 'CONCLUIDA'
