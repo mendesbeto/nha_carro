@@ -51,26 +51,32 @@ jobs:
           psql -v ON_ERROR_STOP=1 -c "CREATE ROLE service_role NOLOGIN BYPASSRLS;"
           psql -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS auth;"
           psql -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS private;"
-          psql -v ON_ERROR_STOP=1 -c "CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS \\$\\$ SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid \\$\\$;"
-          psql -v ON_ERROR_STOP=1 -c "CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS \\$\\$ SELECT coalesce(current_setting('request.jwt.claim.role', true), current_user) \\$\\$;"
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $ SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $;
+          CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $ SELECT coalesce(current_setting('request.jwt.claim.role', true), current_user) $;
+          SQL
 
       - name: Create base schema with PostGIS
         run: |
           psql -v ON_ERROR_STOP=1 -f database/001_initial_schema.sql
-          psql -v ON_ERROR_STOP=1 -c "CREATE OR REPLACE FUNCTION private.my_role() RETURNS text LANGUAGE sql STABLE AS \\$\\$ SELECT coalesce((SELECT u.tipo_perfil::text FROM public.usuarios u WHERE u.id = auth.uid()), 'ANON') \\$\\$;"
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE OR REPLACE FUNCTION private.my_role() RETURNS text LANGUAGE sql STABLE AS $ SELECT coalesce((SELECT u.tipo_perfil::text FROM public.usuarios u WHERE u.id = auth.uid()), 'ANON') $;
+          SQL
 
       - name: Apply migrations 009 through 017 to ephemeral database only
         run: |
-          for migration in \\
-            database/009_wallet_authoritative_settlement.sql \\
-            database/010_fix_driver_acceptance_trigger.sql \\
-            database/011_test_wallet_topup.sql \\
-            database/012_allow_service_role_protected_updates.sql \\
-            database/013_create_wallet_topups.sql \\
-            database/014_harden_wallet_topups.sql \\
-            database/015_confirm_wallet_topup.sql \\
-            database/016_wallet_topup_rpc_wrapper.sql \\
-            database/017_cash_payment_correction.sql; do
+          migrations=(
+            database/009_wallet_authoritative_settlement.sql
+            database/010_fix_driver_acceptance_trigger.sql
+            database/011_test_wallet_topup.sql
+            database/012_allow_service_role_protected_updates.sql
+            database/013_create_wallet_topups.sql
+            database/014_harden_wallet_topups.sql
+            database/015_confirm_wallet_topup.sql
+            database/016_wallet_topup_rpc_wrapper.sql
+            database/017_cash_payment_correction.sql
+          )
+          for migration in "${migrations[@]}"; do
             psql -v ON_ERROR_STOP=1 -f "$migration"
           done
 
