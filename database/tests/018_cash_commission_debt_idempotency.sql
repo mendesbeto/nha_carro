@@ -1,5 +1,5 @@
--- Integration/idempotency test for migration 018.
--- Run ONLY against an isolated disposable database after migrations 001-018.
+-- Integration/idempotency test for settlement migrations 018 and 020.
+-- Run ONLY against an isolated disposable database after migrations 001-020.
 -- This entire script rolls back; it must never be pointed at production.
 begin;
 
@@ -10,6 +10,8 @@ declare
   v_cash_ride uuid := 'a0000000-0000-4000-8000-000000000011';
   v_digital_ride uuid := 'a0000000-0000-4000-8000-000000000012';
   v_legacy_cash_ride uuid := 'a0000000-0000-4000-8000-000000000013';
+  v_unconfirmed_ride uuid := 'a0000000-0000-4000-8000-000000000014';
+  v_rejected boolean := false;
   v_first record;
   v_second record;
   v_count integer;
@@ -33,11 +35,15 @@ begin
     (v_digital_ride, v_passenger, v_driver,
      public.st_setsrid(public.st_makepoint(-15.58, 11.86), 4326),
      public.st_setsrid(public.st_makepoint(-15.57, 11.87), 4326),
-     2500, 500, 'ORANGE_MONEY', 'EM_ANDAMENTO'),
+     2500, 500, 'CARTEIRA', 'EM_ANDAMENTO'),
     (v_legacy_cash_ride, v_passenger, v_driver,
      public.st_setsrid(public.st_makepoint(-15.58, 11.86), 4326),
      public.st_setsrid(public.st_makepoint(-15.57, 11.87), 4326),
-     2500, 500, 'DINHEIRO', 'CONCLUIDA');
+     2500, 500, 'DINHEIRO', 'CONCLUIDA'),
+    (v_unconfirmed_ride, v_passenger, v_driver,
+     public.st_setsrid(public.st_makepoint(-15.58, 11.86), 4326),
+     public.st_setsrid(public.st_makepoint(-15.57, 11.87), 4326),
+     2500, 500, 'ORANGE_MONEY', 'EM_ANDAMENTO');
 
   select * into v_first
   from public.complete_ride_and_settle_wallet(v_cash_ride, v_driver);
@@ -66,6 +72,23 @@ begin
   from public.usuarios where id = v_driver;
   if v_driver_balance <> 1000 then
     raise exception 'A conclusão em dinheiro alterou indevidamente a carteira do motorista: %.', v_driver_balance;
+  end if;
+
+  -- Unconfirmed provider methods must be rejected before status or balances change.
+  begin
+    perform * from public.complete_ride_and_settle_wallet(v_unconfirmed_ride, v_driver);
+  exception when others then
+    v_rejected := true;
+  end;
+  if not v_rejected then
+    raise exception 'Orange Money sem confirmação do provedor deveria ser bloqueado.';
+  end if;
+  if (select status::text from public.corridas where id = v_unconfirmed_ride) <> 'EM_ANDAMENTO' then
+    raise exception 'A rejeição de Orange Money alterou o estado da corrida.';
+  end if;
+  if (select saldo_carteira from public.usuarios where id = v_passenger) <> 10000
+     or (select saldo_carteira from public.usuarios where id = v_driver) <> 1000 then
+    raise exception 'A rejeição de Orange Money alterou os saldos.';
   end if;
 
   select * into v_first
