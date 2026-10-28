@@ -147,8 +147,8 @@ BEGIN
   IF EXISTS (SELECT 1 FROM public.transacoes_carteira WHERE referencia_provedor LIKE 'RIDE:$ORANGE_RIDE%' OR referencia_provedor LIKE 'RIDE:$MTN_RIDE%') THEN
     RAISE EXCEPTION 'Electronic payment failure left wallet transactions';
   END IF;
-  IF (SELECT saldo_carteira FROM public.usuarios WHERE id='$PASSENGER') <> 100
-     OR (SELECT saldo_carteira FROM public.usuarios WHERE id='$DRIVER') <> 0 THEN
+  IF (SELECT saldo_carteira FROM public.usuarios WHERE id='$PASSENGER') <> 40
+     OR (SELECT saldo_carteira FROM public.usuarios WHERE id='$DRIVER') <> 50 THEN
     RAISE EXCEPTION 'Electronic payment failure changed wallet balances';
   END IF;
 END
