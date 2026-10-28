@@ -77,5 +77,8 @@ jobs:
       - name: Apply settlement migration to ephemeral database only
         run: psql -v ON_ERROR_STOP=1 -f database/018_cash_commission_debt_settlement.sql
 
-      - name: Verify cash debt and electronic settlement idempotency
+      - name: Apply explicit wallet payment migration to ephemeral database only
+        run: psql -v ON_ERROR_STOP=1 -f database/020_explicit_wallet_payment_and_block_unconfirmed_methods.sql
+
+      - name: Verify cash debt and wallet settlement idempotency
         run: psql -v ON_ERROR_STOP=1 -f database/tests/018_cash_commission_debt_idempotency.sql
