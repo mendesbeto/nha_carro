@@ -17,6 +17,8 @@ DRIVER='00000000-0000-4000-8000-000000000002'
 OTHER_DRIVER='00000000-0000-4000-8000-000000000003'
 CASH_RIDE='00000000-0000-4000-8000-000000000101'
 WALLET_RIDE='00000000-0000-4000-8000-000000000102'
+ORANGE_RIDE='00000000-0000-4000-8000-000000000105'
+MTN_RIDE='00000000-0000-4000-8000-000000000106'
 LOW_BALANCE_RIDE='00000000-0000-4000-8000-000000000103'
 CANCELLED_RIDE='00000000-0000-4000-8000-000000000104'
 
@@ -27,9 +29,11 @@ INSERT INTO public.usuarios(id,nome,telefone,tipo_perfil,status_conta,saldo_cart
 ('$OTHER_DRIVER','CI Other Driver','0000000003','MOTORISTA','ATIVO',0);
 INSERT INTO public.corridas(id,passageiro_id,motorista_id,valor_total,valor_comissao,forma_pagamento,status) VALUES
 ('$CASH_RIDE','$PASSENGER','$DRIVER',60,10,'DINHEIRO','EM_ANDAMENTO'),
-('$WALLET_RIDE','$PASSENGER','$DRIVER',60,10,'ORANGE_MONEY','EM_ANDAMENTO'),
-('$LOW_BALANCE_RIDE','$PASSENGER','$DRIVER',1000,100,'ORANGE_MONEY','EM_ANDAMENTO'),
-('$CANCELLED_RIDE','$PASSENGER','$DRIVER',60,10,'ORANGE_MONEY','CANCELADA');
+('$WALLET_RIDE','$PASSENGER','$DRIVER',60,10,'CARTEIRA','EM_ANDAMENTO'),
+('$LOW_BALANCE_RIDE','$PASSENGER','$DRIVER',1000,100,'CARTEIRA','EM_ANDAMENTO'),
+('$CANCELLED_RIDE','$PASSENGER','$DRIVER',60,10,'CARTEIRA','CANCELADA'),
+('$ORANGE_RIDE','$PASSENGER','$DRIVER',60,10,'ORANGE_MONEY','EM_ANDAMENTO'),
+('$MTN_RIDE','$PASSENGER','$DRIVER',60,10,'MTN_MONEY','EM_ANDAMENTO');
 UPDATE public.usuarios SET saldo_carteira=20 WHERE id='$PASSENGER';
 SQL
 
@@ -122,6 +126,30 @@ BEGIN
   END IF;
   IF EXISTS (SELECT 1 FROM public.transacoes_carteira WHERE referencia_provedor LIKE 'RIDE:$LOW_BALANCE_RIDE%') THEN
     RAISE EXCEPTION 'Insufficient-balance failure left wallet transactions';
+  END IF;
+END
+\$\$;
+SQL
+
+# Unconfirmed electronic methods must fail before completion or wallet movement.
+for ride in "$ORANGE_RIDE" "$MTN_RIDE"; do
+  if "${PSQL[@]}" -c "SELECT * FROM public.complete_ride_and_settle_wallet('$ride','$DRIVER');" >/tmp/electronic-"$ride".out 2>&1; then
+    echo "Expected unconfirmed electronic payment to fail for ride $ride" >&2
+    exit 1
+  fi
+done
+"${PSQL[@]}" <<SQL
+DO \$\$
+BEGIN
+  IF (SELECT status::text FROM public.corridas WHERE id IN ('$ORANGE_RIDE','$MTN_RIDE') AND status <> 'EM_ANDAMENTO' LIMIT 1) IS NOT NULL THEN
+    RAISE EXCEPTION 'Electronic payment failure changed ride status';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.transacoes_carteira WHERE referencia_provedor LIKE 'RIDE:$ORANGE_RIDE%' OR referencia_provedor LIKE 'RIDE:$MTN_RIDE%') THEN
+    RAISE EXCEPTION 'Electronic payment failure left wallet transactions';
+  END IF;
+  IF (SELECT saldo_carteira FROM public.usuarios WHERE id='$PASSENGER') <> 100
+     OR (SELECT saldo_carteira FROM public.usuarios WHERE id='$DRIVER') <> 0 THEN
+    RAISE EXCEPTION 'Electronic payment failure changed wallet balances';
   END IF;
 END
 \$\$;
