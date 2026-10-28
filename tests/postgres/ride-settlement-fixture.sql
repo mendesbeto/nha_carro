@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TYPE public.status_corrida_enum AS ENUM ('SOLICITADA', 'ACEITA', 'EM_ANDAMENTO', 'CONCLUIDA', 'CANCELADA');
-CREATE TYPE public.forma_pagamento_enum AS ENUM ('DINHEIRO', 'ORANGE_MONEY', 'MTN_MONEY');
+CREATE TYPE public.forma_pagamento_enum AS ENUM ('DINHEIRO', 'CARTEIRA', 'ORANGE_MONEY', 'MTN_MONEY');
 CREATE TYPE public.tipo_transacao_enum AS ENUM ('PAGAMENTO_VIAGEM', 'CREDITO_MOTORISTA', 'DEDUCAO_COMISSAO');
 
 CREATE TABLE public.usuarios (
@@ -121,6 +121,10 @@ begin
 
   if v_ride.status not in ('EM_ANDAMENTO', 'CONCLUIDA') then
     raise exception 'A corrida precisa estar em andamento para ser concluída.';
+  end if;
+
+  if v_ride.forma_pagamento::text not in ('DINHEIRO', 'CARTEIRA') then
+    raise exception 'Método de pagamento eletrónico sem confirmação do provedor; liquidação bloqueada.';
   end if;
 
   if v_ride.status = 'EM_ANDAMENTO' then
