@@ -480,7 +480,7 @@ class ApiService {
   Future<RideRequest> requestRide({
     required String destination,
     required RideCategory category,
-    required PaymentMethod paymentMethod,
+    PaymentMethod paymentMethod = PaymentMethod.cash,
     required double originLat,
     required double originLng,
     double? destinationLat,
@@ -493,7 +493,7 @@ class ApiService {
         body: jsonEncode({
           'destination': destination,
           'category': category.name,
-          'paymentMethod': paymentMethod.name,
+          'paymentMethod': PaymentMethod.cash.name,
           'originLat': originLat,
           'originLng': originLng,
           if (destinationLat != null) 'destinationLat': destinationLat,

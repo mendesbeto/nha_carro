@@ -173,6 +173,24 @@ describe('RidesService', () => {
     },
   );
 
+  it('defaults new ride requests to cash', async () => {
+    const profile = queryChain({ data: { id: 'passenger-1' }, error: null });
+    const insert = queryChain({ data: { id: 'ride-1' }, error: null });
+    supabase.getUserClient.mockReturnValue({
+      from: jest.fn().mockReturnValueOnce(profile).mockReturnValueOnce(insert),
+    });
+
+    await service.request({
+      destination: 'Centro',
+      originLat: 12.3,
+      originLng: -15.4,
+    }, passenger, token);
+
+    expect(insert.insert).toHaveBeenCalledWith(expect.objectContaining({
+      forma_pagamento: 'DINHEIRO',
+    }));
+  });
+
   it('requires both destination coordinates together', async () => {
     await expect(service.request({
       destination: 'Centro',
