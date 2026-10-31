@@ -15,10 +15,8 @@ const FARES: Record<string, number> = {
   moto: 1800,
 };
 
-const PAYMENT_METHODS: Record<string, 'DINHEIRO' | 'ORANGE_MONEY' | 'MTN_MONEY'> = {
+const PAYMENT_METHODS: Record<string, 'DINHEIRO'> = {
   cash: 'DINHEIRO',
-  orangeMoney: 'ORANGE_MONEY',
-  mtnMoney: 'MTN_MONEY',
 };
 
 @Injectable()
@@ -734,29 +732,13 @@ export class RidesService {
     const paymentMethod = dto.paymentMethod ?? 'cash';
     const estimatedFare = FARES[category] ?? FARES.taxi;
 
-    // Fail early for wallet-funded electronic methods, not at ride completion.
-    // Cash rides never require wallet balance. Settlement still performs its
-    // authoritative balance check to protect against concurrent spending.
+    // Mobile-money providers are not integrated yet; reject before any DB access.
     if (paymentMethod !== 'cash') {
-      const walletClient = this.supabase.getUserClient(accessToken);
-      const walletCheck = await walletClient
-        .from('usuarios')
-        .select('saldo_carteira')
-        .eq('id', user.sub)
-        .maybeSingle();
-
-      if (walletCheck.error || !walletCheck.data) {
-        throw new BadRequestException(
-          'Não foi possível verificar o saldo da carteira. Tente novamente.',
-        );
-      }
-
-      if (Number(walletCheck.data.saldo_carteira) < estimatedFare) {
-        throw new BadRequestException(
-          `Saldo insuficiente. A viagem custa ${estimatedFare} CFA e a sua carteira tem ${Number(walletCheck.data.saldo_carteira)} CFA. Escolha dinheiro ou carregue a carteira antes de solicitar.`,
-        );
-      }
+      throw new BadRequestException(
+        'Orange Money e MTN Mobile Money estão temporariamente indisponíveis. Escolha pagamento em dinheiro.',
+      );
     }
+
     const response: {
       origin: string;
       destination: string;
