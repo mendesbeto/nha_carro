@@ -18,7 +18,8 @@ export class RequestRideDto {
   @IsOptional()
   category?: string = 'taxi';
 
-  @IsIn(['cash', 'orangeMoney', 'mtnMoney'])
+  // Temporarily cash-only while mobile-money providers are not integrated.
+  @IsIn(['cash'])
   @IsOptional()
   paymentMethod?: string = 'cash';
 

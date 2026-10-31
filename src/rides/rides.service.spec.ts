@@ -125,21 +125,17 @@ describe('RidesService', () => {
     await expect(service.cancel('ride-1', driver, token)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('persists a ride with server-side fare, commission and payment mapping', async () => {
+  it('persists a cash ride with server-side fare and commission', async () => {
     const profile = queryChain({ data: { id: 'passenger-1' }, error: null });
-    const walletBalance = queryChain({ data: { saldo_carteira: 10000 }, error: null });
     const insert = queryChain({ data: { id: 'ride-1' }, error: null });
     supabase.getUserClient.mockReturnValue({
-      from: jest.fn()
-        .mockReturnValueOnce(profile)
-        .mockReturnValueOnce(walletBalance)
-        .mockReturnValueOnce(insert),
+      from: jest.fn().mockReturnValueOnce(profile).mockReturnValueOnce(insert),
     });
 
     const result = await service.request({
       destination: 'Centro',
       category: 'confort',
-      paymentMethod: 'orangeMoney',
+      paymentMethod: 'cash',
       originLat: 12.3,
       originLng: -15.4,
       destinationLat: 12.4,
@@ -150,10 +146,46 @@ describe('RidesService', () => {
       passageiro_id: 'passenger-1',
       valor_total: 3500,
       valor_comissao: 700,
-      forma_pagamento: 'ORANGE_MONEY',
+      forma_pagamento: 'DINHEIRO',
       status: 'SOLICITADA',
     }));
     expect(result).toMatchObject({ rideId: 'ride-1', persisted: true, estimatedFare: 3500 });
+  });
+
+  it.each(['orangeMoney', 'mtnMoney'])(
+    'rejects temporarily unavailable payment method %s before database access',
+    async (paymentMethod) => {
+      await expect(service.request({
+        destination: 'Centro',
+        category: 'taxi',
+        paymentMethod,
+        originLat: 12.3,
+        originLng: -15.4,
+        destinationLat: 12.4,
+        destinationLng: -15.5,
+      }, passenger, token)).rejects.toThrow(
+        'temporariamente indisponíveis. Escolha pagamento em dinheiro.',
+      );
+      expect(supabase.getUserClient).not.toHaveBeenCalled();
+    },
+  );
+
+  it('defaults new ride requests to cash', async () => {
+    const profile = queryChain({ data: { id: 'passenger-1' }, error: null });
+    const insert = queryChain({ data: { id: 'ride-1' }, error: null });
+    supabase.getUserClient.mockReturnValue({
+      from: jest.fn().mockReturnValueOnce(profile).mockReturnValueOnce(insert),
+    });
+
+    await service.request({
+      destination: 'Centro',
+      originLat: 12.3,
+      originLng: -15.4,
+    }, passenger, token);
+
+    expect(insert.insert).toHaveBeenCalledWith(expect.objectContaining({
+      forma_pagamento: 'DINHEIRO',
+    }));
   });
 
   it('requires both destination coordinates together', async () => {

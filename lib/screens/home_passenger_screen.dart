@@ -193,23 +193,10 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
   }
 
   Future<void> _loadPreferredPayment() async {
-    final preferredPayment = await _authService.loadPreferredPayment();
+    // Temporary rollout: ignore legacy electronic preferences and persist cash.
+    await _authService.savePreferredPayment('cash');
     if (!mounted) return;
-
-    switch (preferredPayment) {
-      case 'cash':
-        _payment = PaymentMethod.cash;
-        break;
-      case 'orangeMoney':
-        _payment = PaymentMethod.orangeMoney;
-        break;
-      case 'mtnMoney':
-        _payment = PaymentMethod.mtnMoney;
-        break;
-      default:
-        _payment = PaymentMethod.orangeMoney;
-    }
-    setState(() {});
+    setState(() => _payment = PaymentMethod.cash);
   }
 
   Future<void> _updatePreferredPayment(PaymentMethod payment) async {
@@ -1370,19 +1357,11 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
               value: PaymentMethod.cash,
               child: Text('Dinheiro'),
             ),
-            DropdownMenuItem(
-              value: PaymentMethod.orangeMoney,
-              child: Text('Orange Money'),
-            ),
-            DropdownMenuItem(
-              value: PaymentMethod.mtnMoney,
-              child: Text('MTN Mobile Money'),
-            ),
           ],
           onChanged: (value) {
             if (value != null) {
-              setState(() => _payment = value);
-              _authService.savePreferredPayment(value.name);
+              setState(() => _payment = PaymentMethod.cash);
+              _authService.savePreferredPayment('cash');
             }
           },
         ),
