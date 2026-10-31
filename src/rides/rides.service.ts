@@ -15,10 +15,8 @@ const FARES: Record<string, number> = {
   moto: 1800,
 };
 
-const PAYMENT_METHODS: Record<string, 'DINHEIRO' | 'ORANGE_MONEY' | 'MTN_MONEY'> = {
+const PAYMENT_METHODS: Record<string, 'DINHEIRO'> = {
   cash: 'DINHEIRO',
-  orangeMoney: 'ORANGE_MONEY',
-  mtnMoney: 'MTN_MONEY',
 };
 
 @Injectable()
