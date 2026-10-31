@@ -1370,19 +1370,11 @@ class _HomePassengerScreenState extends State<HomePassengerScreen> {
               value: PaymentMethod.cash,
               child: Text('Dinheiro'),
             ),
-            DropdownMenuItem(
-              value: PaymentMethod.orangeMoney,
-              child: Text('Orange Money'),
-            ),
-            DropdownMenuItem(
-              value: PaymentMethod.mtnMoney,
-              child: Text('MTN Mobile Money'),
-            ),
           ],
           onChanged: (value) {
             if (value != null) {
-              setState(() => _payment = value);
-              _authService.savePreferredPayment(value.name);
+              setState(() => _payment = PaymentMethod.cash);
+              _authService.savePreferredPayment('cash');
             }
           },
         ),
