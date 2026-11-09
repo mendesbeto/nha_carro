@@ -59,6 +59,12 @@ export class RidesController {
     return this.ridesService.setDriverAvailability(body, user, accessToken);
   }
 
+  @Get('admin/history')
+  @UseGuards(JwtAuthGuard)
+  adminHistory(@CurrentUser() user: CurrentUserPayload) {
+    return this.ridesService.adminHistory(user);
+  }
+
   @Get(':rideId/route')
   @UseGuards(JwtAuthGuard)
   getRoadRoute(
