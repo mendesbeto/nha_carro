@@ -763,6 +763,9 @@ class _AdminSummaryPanelState extends State<_AdminSummaryPanel> {
         final users = Map<String, dynamic>.from(data['users'] as Map? ?? {});
         final rides = Map<String, dynamic>.from(data['rides'] as Map? ?? {});
         final financial = Map<String, dynamic>.from(data['financial'] as Map? ?? {});
+        final driverRating = users['averageDriverRating'] == null
+            ? 'Sem avaliações'
+            : '${_number(users['averageDriverRating'])} ★ (${_number(users['driversRated'])} avaliados)';
         final activity = (data['weeklyActivity'] as List? ?? const [])
             .whereType<Map>()
             .map((day) => Map<String, dynamic>.from(day))
@@ -792,6 +795,7 @@ class _AdminSummaryPanelState extends State<_AdminSummaryPanel> {
             _metric('Valor médio por corrida concluída', '${_number(financial['averageCompletedFare'])} CFA', Icons.trending_up_rounded),
             _metric('Motoristas registados', _number(users['drivers']), Icons.drive_eta_outlined),
             _metric('Clientes registados', _number(users['passengers']), Icons.people_outline_rounded),
+            _metric('Avaliação média dos motoristas', driverRating, Icons.star_outline_rounded),
             const SizedBox(height: 12),
             const _SectionTitle(title: 'Atividade dos últimos 7 dias'),
             const SizedBox(height: 8),
