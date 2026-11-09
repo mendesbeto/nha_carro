@@ -21,7 +21,7 @@ const driver = { sub: 'driver-1', email: 'd@example.com', role: 'driver' as cons
 const token = 'access-token';
 
 describe('RidesService', () => {
-  let supabase: { getUserClient: jest.Mock };
+  let supabase: { getUserClient: jest.Mock; getClient: jest.Mock };
   let wallet: { completeRideSettlement: jest.Mock };
   let service: RidesService;
 
