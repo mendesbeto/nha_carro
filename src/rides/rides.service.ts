@@ -359,6 +359,42 @@ export class RidesService {
     };
   }
 
+  async adminHistory(user: CurrentUserPayload) {
+    if (user.role !== 'admin') {
+      throw new ForbiddenException('Apenas administradores podem consultar o histórico de corridas.');
+    }
+
+    const result = await this.supabase
+      .getClient()
+      .from('corridas')
+      .select(
+        'id, passageiro_id, motorista_id, valor_total, valor_comissao, forma_pagamento, status, criado_em, passageiro:usuarios!corridas_passageiro_id_fkey(nome, telefone), motorista:usuarios!corridas_motorista_id_fkey(nome, telefone)',
+      )
+      .order('criado_em', { ascending: false })
+      .limit(100);
+
+    if (result.error) {
+      throw new BadRequestException(
+        result.error.message ?? 'Não foi possível carregar o histórico de corridas.',
+      );
+    }
+
+    return {
+      rides: (result.data ?? []).map((ride) => ({
+        rideId: ride.id,
+        passageiroId: ride.passageiro_id,
+        passageiro: ride.passageiro ?? null,
+        motoristaId: ride.motorista_id,
+        motorista: ride.motorista ?? null,
+        valor: ride.valor_total,
+        comissao: ride.valor_comissao,
+        formaPagamento: ride.forma_pagamento,
+        status: ride.status,
+        criadoEm: ride.criado_em,
+      })),
+    };
+  }
+
   async get(
     rideId: string,
     user: CurrentUserPayload,
