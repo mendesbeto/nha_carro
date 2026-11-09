@@ -230,46 +230,6 @@ class _AdminScreenState extends State<AdminScreen> {
 }
 
 
-class _AdminUserCountCard extends StatelessWidget {
-  const _AdminUserCountCard({
-    required this.title,
-    required this.icon,
-    required this.future,
-  });
-
-  final String title;
-  final IconData icon;
-  final Future<Map<String, dynamic>> future;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: FutureBuilder<Map<String, dynamic>>(
-        future: future,
-        builder: (context, snapshot) {
-          String value;
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            value = 'A carregar…';
-          } else if (snapshot.hasError) {
-            value = 'Indisponível';
-          } else {
-            final users = (snapshot.data?['users'] as List? ?? const []);
-            value = users.length.toString();
-          }
-          return ListTile(
-            leading: CircleAvatar(child: Icon(icon)),
-            title: Text(title),
-            trailing: Text(
-              value,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title});
 
@@ -824,7 +784,7 @@ class _AdminSummaryPanelState extends State<_AdminSummaryPanel> {
                                   ),
                                 ),
                                 const SizedBox(width: 10),
-                                Text('$total • ${completed} concl. • ${cancelled} canc.'),
+                                Text('$total • $completed concl. • $cancelled canc.'),
                               ],
                             ),
                           );
