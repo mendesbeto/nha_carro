@@ -238,6 +238,29 @@ class ApiService {
     return data;
   }
 
+  Future<List<Map<String, dynamic>>> getAdminRideHistory() async {
+    final response = await _authenticatedRequest(
+      () async => http.get(
+        Uri.parse('$_baseUrl/rides/admin/history'),
+        headers: await _headers(authenticated: true),
+      ),
+    );
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(
+        data['message'] ??
+            data['error'] ??
+            'Não foi possível carregar o histórico de corridas.',
+      );
+    }
+    final rides = data['rides'];
+    if (rides is! List) return <Map<String, dynamic>>[];
+    return rides
+        .whereType<Map>()
+        .map((ride) => Map<String, dynamic>.from(ride))
+        .toList();
+  }
+
   Future<Map<String, dynamic>> getAdminUsers(String profile) async {
     final response = await _authenticatedRequest(
       () async => http.get(
