@@ -51,7 +51,7 @@ describe('RidesService', () => {
         query.range = jest.fn(async () => ({
           data: table === 'corridas'
             ? (query._rangeFrom === 0 ? rideRows : [])
-            : (query._rangeFrom === 0 ? [{ id: 'u1' }] : []),
+            : (query._rangeFrom === 0 ? [{ id: 'u1', avaliacao_media: 4.5 }] : []),
           error: null,
         }));
         query.eq = jest.fn(() => query);
@@ -79,7 +79,12 @@ describe('RidesService', () => {
       averageCompletedFare: 3000,
       currency: 'CFA',
     });
-    expect(result.users).toMatchObject({ drivers: 1, passengers: 1 });
+    expect(result.users).toMatchObject({
+      drivers: 1,
+      passengers: 1,
+      driversRated: 1,
+      averageDriverRating: 4.5,
+    });
   });
 
   it('rejects admin ride history for non-admin users', async () => {
