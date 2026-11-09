@@ -238,6 +238,24 @@ class ApiService {
     return data;
   }
 
+  Future<Map<String, dynamic>> getAdminSummary() async {
+    final response = await _authenticatedRequest(
+      () async => http.get(
+        Uri.parse('$_baseUrl/rides/admin/summary'),
+        headers: await _headers(authenticated: true),
+      ),
+    );
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(
+        data['message'] ??
+            data['error'] ??
+            'Não foi possível carregar o resumo operacional.',
+      );
+    }
+    return data;
+  }
+
   Future<List<Map<String, dynamic>>> getAdminRideHistory() async {
     final response = await _authenticatedRequest(
       () async => http.get(

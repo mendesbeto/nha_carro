@@ -359,6 +359,132 @@ export class RidesService {
     };
   }
 
+  async adminSummary(user: CurrentUserPayload) {
+    if (user.role !== 'admin') {
+      throw new ForbiddenException('Apenas administradores podem consultar o resumo operacional.');
+    }
+
+    const client = this.supabase.getClient();
+    const pageSize = 1000;
+    const rides: Array<{
+      status: string;
+      valor_total: number | string | null;
+      valor_comissao: number | string | null;
+      criado_em: string;
+    }> = [];
+
+    for (let from = 0; ; from += pageSize) {
+      const page = await client
+        .from('corridas')
+        .select('status, valor_total, valor_comissao, criado_em')
+        .order('criado_em', { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (page.error) {
+        throw new BadRequestException(
+          page.error.message ?? 'Não foi possível calcular o resumo das corridas.',
+        );
+      }
+      const rows = page.data ?? [];
+      rides.push(...rows);
+      if (rows.length < pageSize) break;
+    }
+
+    const usersByProfile: Record<string, number> = {
+      MOTORISTA: 0,
+      PASSAGEIRO: 0,
+    };
+    let driverRatingSum = 0;
+    let driversRated = 0;
+    for (const profile of Object.keys(usersByProfile)) {
+      for (let from = 0; ; from += pageSize) {
+        const page = await client
+          .from('usuarios')
+          .select('id, avaliacao_media')
+          .eq('tipo_perfil', profile)
+          .order('criado_em', { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (page.error) {
+          throw new BadRequestException(
+            page.error.message ?? 'Não foi possível calcular os utilizadores registados.',
+          );
+        }
+        const rows = page.data ?? [];
+        usersByProfile[profile] += rows.length;
+        if (profile === 'MOTORISTA') {
+          for (const row of rows) {
+            const rating = Number(row.avaliacao_media);
+            if (Number.isFinite(rating) && rating > 0 && rating <= 5) {
+              driverRatingSum += rating;
+              driversRated += 1;
+            }
+          }
+        }
+        if (rows.length < pageSize) break;
+      }
+    }
+
+    const completed = rides.filter((ride) => ride.status === 'CONCLUIDA');
+    const cancelled = rides.filter((ride) => ride.status === 'CANCELADA');
+    const grossCompleted = completed.reduce(
+      (sum, ride) => sum + Number(ride.valor_total ?? 0),
+      0,
+    );
+    const commissions = completed.reduce(
+      (sum, ride) => sum + Number(ride.valor_comissao ?? 0),
+      0,
+    );
+    const today = new Date();
+    const sevenDaysAgo = new Date(Date.UTC(
+      today.getUTCFullYear(),
+      today.getUTCMonth(),
+      today.getUTCDate() - 6,
+    ));
+    const activity = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(sevenDaysAgo);
+      date.setUTCDate(sevenDaysAgo.getUTCDate() + index);
+      const key = date.toISOString().slice(0, 10);
+      const dayRides = rides.filter(
+        (ride) => new Date(ride.criado_em).toISOString().slice(0, 10) === key,
+      );
+      return {
+        date: key,
+        total: dayRides.length,
+        completed: dayRides.filter((ride) => ride.status === 'CONCLUIDA').length,
+        cancelled: dayRides.filter((ride) => ride.status === 'CANCELADA').length,
+      };
+    });
+
+    return {
+      users: {
+        drivers: usersByProfile.MOTORISTA,
+        passengers: usersByProfile.PASSAGEIRO,
+        driversRated,
+        averageDriverRating: driversRated
+          ? Math.round((driverRatingSum / driversRated) * 10) / 10
+          : null,
+      },
+      rides: {
+        total: rides.length,
+        completed: completed.length,
+        cancelled: cancelled.length,
+        active: rides.filter((ride) =>
+          ['SOLICITADA', 'ACEITA', 'EM_ANDAMENTO'].includes(ride.status),
+        ).length,
+      },
+      financial: {
+        grossCompleted: grossCompleted,
+        commissionsAccrued: commissions,
+        averageCompletedFare: completed.length
+          ? grossCompleted / completed.length
+          : 0,
+        currency: 'CFA',
+        note: 'Valores brutos de corridas concluídas pagas em dinheiro; não representam receita líquida da plataforma.',
+      },
+      weeklyActivity: activity,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   async adminHistory(user: CurrentUserPayload) {
     if (user.role !== 'admin') {
       throw new ForbiddenException('Apenas administradores podem consultar o histórico de corridas.');

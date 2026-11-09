@@ -85,48 +85,7 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
           Expanded(
             child: _selectedTab == 0
-                ? ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
-                    children: [
-                      const Text('Resumo operacional',
-                          style: TextStyle(
-                              fontSize: 26, fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Os indicadores de viagens, receita e atividade em tempo real ainda não estão ligados aos dados de produção. Para evitar números fictícios, o resumo apresenta apenas dados reais disponíveis.',
-                      ),
-                      const SizedBox(height: 16),
-                      _AdminUserCountCard(
-                        title: 'Motoristas registados',
-                        icon: Icons.drive_eta_outlined,
-                        future: driversFuture,
-                      ),
-                      const SizedBox(height: 12),
-                      _AdminUserCountCard(
-                        title: 'Clientes registados',
-                        icon: Icons.people_outline_rounded,
-                        future: passengersFuture,
-                      ),
-                      const SizedBox(height: 16),
-                      const Card(
-                        child: Padding(
-                          padding: EdgeInsets.all(16),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(Icons.info_outline_rounded),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'As estatísticas de viagens, receita, cancelamentos, avaliação e atividade semanal serão apresentadas quando existir uma ligação validada aos respetivos dados.',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
+                ? const _AdminSummaryPanel()
                 : _selectedTab == 1
                     ? ListView(
                         padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
@@ -270,46 +229,6 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 }
 
-
-class _AdminUserCountCard extends StatelessWidget {
-  const _AdminUserCountCard({
-    required this.title,
-    required this.icon,
-    required this.future,
-  });
-
-  final String title;
-  final IconData icon;
-  final Future<Map<String, dynamic>> future;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: FutureBuilder<Map<String, dynamic>>(
-        future: future,
-        builder: (context, snapshot) {
-          String value;
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            value = 'A carregar…';
-          } else if (snapshot.hasError) {
-            value = 'Indisponível';
-          } else {
-            final users = (snapshot.data?['users'] as List? ?? const []);
-            value = users.length.toString();
-          }
-          return ListTile(
-            leading: CircleAvatar(child: Icon(icon)),
-            title: Text(title),
-            trailing: Text(
-              value,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
 
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title});
@@ -727,6 +646,162 @@ class _AdminRidesPanelState extends State<_AdminRidesPanel> {
           },
         ),
       ],
+    );
+  }
+}
+
+class _AdminSummaryPanel extends StatefulWidget {
+  const _AdminSummaryPanel();
+
+  @override
+  State<_AdminSummaryPanel> createState() => _AdminSummaryPanelState();
+}
+
+class _AdminSummaryPanelState extends State<_AdminSummaryPanel> {
+  late Future<Map<String, dynamic>> _summaryFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _summaryFuture = ApiService().getAdminSummary();
+  }
+
+  void _reload() {
+    setState(() {
+      _summaryFuture = ApiService().getAdminSummary();
+    });
+  }
+
+  String _number(dynamic value) {
+    final number = (value as num?)?.toDouble() ?? double.tryParse('$value') ?? 0;
+    return number.toStringAsFixed(number == number.roundToDouble() ? 0 : 1);
+  }
+
+  Widget _metric(String title, String value, IconData icon) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            CircleAvatar(child: Icon(icon)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.bodyMedium),
+                  const SizedBox(height: 4),
+                  Text(value, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _summaryFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              const Text('Resumo operacional', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
+              Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('Não foi possível carregar os indicadores reais: ${snapshot.error}'))),
+              FilledButton.icon(onPressed: _reload, icon: const Icon(Icons.refresh), label: const Text('Tentar novamente')),
+            ],
+          );
+        }
+        final data = snapshot.data ?? <String, dynamic>{};
+        final users = Map<String, dynamic>.from(data['users'] as Map? ?? {});
+        final rides = Map<String, dynamic>.from(data['rides'] as Map? ?? {});
+        final financial = Map<String, dynamic>.from(data['financial'] as Map? ?? {});
+        final driverRating = users['averageDriverRating'] == null
+            ? 'Sem avaliações'
+            : '${_number(users['averageDriverRating'])} ★ (${_number(users['driversRated'])} avaliados)';
+        final activity = (data['weeklyActivity'] as List? ?? const [])
+            .whereType<Map>()
+            .map((day) => Map<String, dynamic>.from(day))
+            .toList();
+        final maxDaily = activity.fold<int>(0, (max, day) {
+          final count = (day['total'] as num?)?.toInt() ?? 0;
+          return count > max ? count : max;
+        });
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
+          children: [
+            Row(
+              children: [
+                const Expanded(child: Text('Resumo operacional', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800))),
+                IconButton(onPressed: _reload, tooltip: 'Atualizar indicadores', icon: const Icon(Icons.refresh_rounded)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text('Indicadores calculados a partir dos registos reais de produção.'),
+            const SizedBox(height: 16),
+            _metric('Corridas registadas', _number(rides['total']), Icons.local_taxi_outlined),
+            _metric('Corridas concluídas', _number(rides['completed']), Icons.check_circle_outline),
+            _metric('Corridas canceladas', _number(rides['cancelled']), Icons.cancel_outlined),
+            _metric('Corridas em curso/pendentes', _number(rides['active']), Icons.pending_actions_outlined),
+            _metric('Valor bruto das corridas concluídas', '${_number(financial['grossCompleted'])} CFA', Icons.payments_outlined),
+            _metric('Comissões geradas', '${_number(financial['commissionsAccrued'])} CFA', Icons.account_balance_wallet_outlined),
+            _metric('Valor médio por corrida concluída', '${_number(financial['averageCompletedFare'])} CFA', Icons.trending_up_rounded),
+            _metric('Motoristas registados', _number(users['drivers']), Icons.drive_eta_outlined),
+            _metric('Clientes registados', _number(users['passengers']), Icons.people_outline_rounded),
+            _metric('Avaliação média dos motoristas', driverRating, Icons.star_outline_rounded),
+            const SizedBox(height: 12),
+            const _SectionTitle(title: 'Atividade dos últimos 7 dias'),
+            const SizedBox(height: 8),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: activity.isEmpty
+                    ? const Text('Sem atividade registada neste período.')
+                    : Column(
+                        children: activity.map((day) {
+                          final total = (day['total'] as num?)?.toInt() ?? 0;
+                          final completed = (day['completed'] as num?)?.toInt() ?? 0;
+                          final cancelled = (day['cancelled'] as num?)?.toInt() ?? 0;
+                          final date = DateTime.tryParse('${day['date']}');
+                          final label = date == null ? '${day['date']}' : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
+                          final ratio = maxDaily == 0 ? 0.0 : total / maxDaily;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              children: [
+                                SizedBox(width: 48, child: Text(label)),
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: LinearProgressIndicator(value: ratio, minHeight: 10),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text('$total • $completed concl. • $cancelled canc.'),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              financial['note']?.toString() ?? 'Os valores financeiros são informativos.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            Text('Atualizado: ${data['generatedAt'] ?? '—'}', style: Theme.of(context).textTheme.bodySmall),
+          ],
+        );
+      },
     );
   }
 }

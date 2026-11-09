@@ -32,6 +32,61 @@ describe('RidesService', () => {
     service = new RidesService(supabase as never, wallet as never);
   });
 
+  it('rejects admin operational summary for non-admin users', async () => {
+    await expect(service.adminSummary(passenger)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(supabase.getClient).not.toHaveBeenCalled();
+  });
+
+  it('aggregates real ride and user records for the admin summary', async () => {
+    const rideRows = [
+      { status: 'CONCLUIDA', valor_total: 2500, valor_comissao: 500, criado_em: '2026-11-09T09:00:00Z' },
+      { status: 'CONCLUIDA', valor_total: 3500, valor_comissao: 700, criado_em: '2026-11-08T09:00:00Z' },
+      { status: 'CANCELADA', valor_total: 0, valor_comissao: 0, criado_em: '2026-11-07T09:00:00Z' },
+    ];
+    const client: any = {
+      from: jest.fn((table: string) => {
+        const query: any = {};
+        query.select = jest.fn(() => query);
+        query.order = jest.fn(() => query);
+        query.range = jest.fn(async () => ({
+          data: table === 'corridas'
+            ? (query._rangeFrom === 0 ? rideRows : [])
+            : (query._rangeFrom === 0 ? [{ id: 'u1', avaliacao_media: 4.5 }] : []),
+          error: null,
+        }));
+        query.eq = jest.fn(() => query);
+        query.range = jest.fn((from: number) => {
+          query._rangeFrom = from;
+          return Promise.resolve({
+            data: table === 'corridas'
+              ? (from === 0 ? rideRows : [])
+              : (from === 0 ? [{ id: 'u1', avaliacao_media: 4.5 }] : []),
+            error: null,
+          });
+        });
+        return query;
+      }),
+    };
+    supabase.getClient.mockReturnValue(client);
+    const admin = { sub: 'admin-1', email: 'a@example.com', role: 'admin' as const };
+
+    const result = await service.adminSummary(admin);
+
+    expect(result.rides).toMatchObject({ total: 3, completed: 2, cancelled: 1, active: 0 });
+    expect(result.financial).toMatchObject({
+      grossCompleted: 6000,
+      commissionsAccrued: 1200,
+      averageCompletedFare: 3000,
+      currency: 'CFA',
+    });
+    expect(result.users).toMatchObject({
+      drivers: 1,
+      passengers: 1,
+      driversRated: 1,
+      averageDriverRating: 4.5,
+    });
+  });
+
   it('rejects admin ride history for non-admin users', async () => {
     await expect(service.adminHistory(passenger)).rejects.toBeInstanceOf(ForbiddenException);
     expect(supabase.getClient).not.toHaveBeenCalled();

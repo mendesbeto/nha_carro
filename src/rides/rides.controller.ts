@@ -59,6 +59,12 @@ export class RidesController {
     return this.ridesService.setDriverAvailability(body, user, accessToken);
   }
 
+  @Get('admin/summary')
+  @UseGuards(JwtAuthGuard)
+  adminSummary(@CurrentUser() user: CurrentUserPayload) {
+    return this.ridesService.adminSummary(user);
+  }
+
   @Get('admin/history')
   @UseGuards(JwtAuthGuard)
   adminHistory(@CurrentUser() user: CurrentUserPayload) {
