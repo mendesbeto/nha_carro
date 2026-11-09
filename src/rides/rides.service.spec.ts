@@ -60,7 +60,7 @@ describe('RidesService', () => {
           return Promise.resolve({
             data: table === 'corridas'
               ? (from === 0 ? rideRows : [])
-              : (from === 0 ? [{ id: 'u1' }] : []),
+              : (from === 0 ? [{ id: 'u1', avaliacao_media: 4.5 }] : []),
             error: null,
           });
         });
