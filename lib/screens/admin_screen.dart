@@ -71,6 +71,10 @@ class _AdminScreenState extends State<AdminScreen> {
                     icon: Icon(Icons.account_balance_wallet_outlined)),
                 ButtonSegment<int>(
                     value: 4,
+                    label: Text('Corridas'),
+                    icon: Icon(Icons.receipt_long_outlined)),
+                ButtonSegment<int>(
+                    value: 5,
                     label: Text('Suporte'),
                     icon: Icon(Icons.support_agent_outlined)),
               ],
@@ -222,7 +226,9 @@ class _AdminScreenState extends State<AdminScreen> {
                                   ),
                                 ],
                               )
-                            : ListView(
+                            : _selectedTab == 4
+                        ? const _AdminRidesPanel()
+                        : ListView(
                                 padding:
                                     const EdgeInsets.fromLTRB(20, 6, 20, 28),
                                 children: [
@@ -573,3 +579,155 @@ class _CommissionDebtPanelState extends State<_CommissionDebtPanel> {
     );
   }
 }
+
+class _AdminRidesPanel extends StatefulWidget {
+  const _AdminRidesPanel();
+
+  @override
+  State<_AdminRidesPanel> createState() => _AdminRidesPanelState();
+}
+
+class _AdminRidesPanelState extends State<_AdminRidesPanel> {
+  late Future<List<Map<String, dynamic>>> _ridesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _ridesFuture = ApiService().getAdminRideHistory();
+  }
+
+  void _reload() {
+    setState(() {
+      _ridesFuture = ApiService().getAdminRideHistory();
+    });
+  }
+
+  String _dateLabel(dynamic raw) {
+    final date = DateTime.tryParse('$raw');
+    if (date == null) return 'Data indisponível';
+    final local = date.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}/'
+        '${local.month.toString().padLeft(2, '0')}/${local.year} '
+        '${local.hour.toString().padLeft(2, '0')}:'
+        '${local.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'CONCLUIDA':
+        return 'Concluída';
+      case 'EM_ANDAMENTO':
+        return 'Em andamento';
+      case 'ACEITA':
+        return 'Aceite';
+      case 'SOLICITADA':
+        return 'Solicitada';
+      case 'CANCELADA':
+        return 'Cancelada';
+      default:
+        return status;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: _SectionTitle(title: 'Histórico de corridas'),
+            ),
+            IconButton(
+              onPressed: _reload,
+              tooltip: 'Atualizar corridas',
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        const Text('Últimas 100 corridas, incluindo as concluídas.'),
+        const SizedBox(height: 12),
+        FutureBuilder<List<Map<String, dynamic>>>(
+          future: _ridesFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+            if (snapshot.hasError) {
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Erro ao carregar corridas: ${snapshot.error}',
+                  ),
+                ),
+              );
+            }
+            final rides = snapshot.data ?? const <Map<String, dynamic>>[];
+            if (rides.isEmpty) {
+              return const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('Ainda não existem corridas registadas.'),
+                ),
+              );
+            }
+            return Card(
+              child: Column(
+                children: rides.map((ride) {
+                  final passenger = ride['passageiro'] is Map
+                      ? Map<String, dynamic>.from(ride['passageiro'] as Map)
+                      : <String, dynamic>{};
+                  final driver = ride['motorista'] is Map
+                      ? Map<String, dynamic>.from(ride['motorista'] as Map)
+                      : <String, dynamic>{};
+                  final rideId = '${ride['rideId'] ?? ''}';
+                  final amount = double.tryParse('${ride['valor']}') ?? 0;
+                  final status = '${ride['status'] ?? 'DESCONHECIDO'}';
+                  final payment = '${ride['formaPagamento'] ?? '—'}';
+                  final passengerName =
+                      passenger['nome'] as String? ?? 'Passageiro';
+                  final driverName =
+                      driver['nome'] as String? ?? 'Não atribuído';
+
+                  return Column(
+                    children: [
+                      ListTile(
+                        leading: CircleAvatar(
+                          child: Icon(
+                            status == 'CONCLUIDA'
+                                ? Icons.check_circle_outline
+                                : Icons.local_taxi_outlined,
+                          ),
+                        ),
+                        title: Text(
+                          '${amount.toStringAsFixed(0)} CFA • ${_statusLabel(status)}',
+                        ),
+                        subtitle: Text(
+                          'Passageiro: $passengerName\n'
+                          'Motorista: $driverName\n'
+                          'Pagamento: $payment • ${_dateLabel(ride['criadoEm'])}'
+                          '${rideId.isEmpty ? '' : '\nID: ${rideId.substring(0, rideId.length > 8 ? 8 : rideId.length)}'}',
+                        ),
+                        isThreeLine: true,
+                      ),
+                      if (ride != rides.last) const Divider(height: 1),
+                    ],
+                  );
+                }).toList(),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
