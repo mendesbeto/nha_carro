@@ -393,11 +393,13 @@ export class RidesService {
       MOTORISTA: 0,
       PASSAGEIRO: 0,
     };
+    let driverRatingSum = 0;
+    let driversRated = 0;
     for (const profile of Object.keys(usersByProfile)) {
       for (let from = 0; ; from += pageSize) {
         const page = await client
           .from('usuarios')
-          .select('id')
+          .select('id, avaliacao_media')
           .eq('tipo_perfil', profile)
           .order('criado_em', { ascending: true })
           .range(from, from + pageSize - 1);
@@ -408,6 +410,15 @@ export class RidesService {
         }
         const rows = page.data ?? [];
         usersByProfile[profile] += rows.length;
+        if (profile === 'MOTORISTA') {
+          for (const row of rows) {
+            const rating = Number(row.avaliacao_media);
+            if (Number.isFinite(rating) && rating > 0 && rating <= 5) {
+              driverRatingSum += rating;
+              driversRated += 1;
+            }
+          }
+        }
         if (rows.length < pageSize) break;
       }
     }
@@ -423,12 +434,14 @@ export class RidesService {
       0,
     );
     const today = new Date();
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(today.getDate() - 6);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
+    const sevenDaysAgo = new Date(Date.UTC(
+      today.getUTCFullYear(),
+      today.getUTCMonth(),
+      today.getUTCDate() - 6,
+    ));
     const activity = Array.from({ length: 7 }, (_, index) => {
       const date = new Date(sevenDaysAgo);
-      date.setDate(sevenDaysAgo.getDate() + index);
+      date.setUTCDate(sevenDaysAgo.getUTCDate() + index);
       const key = date.toISOString().slice(0, 10);
       const dayRides = rides.filter(
         (ride) => new Date(ride.criado_em).toISOString().slice(0, 10) === key,
@@ -445,6 +458,10 @@ export class RidesService {
       users: {
         drivers: usersByProfile.MOTORISTA,
         passengers: usersByProfile.PASSAGEIRO,
+        driversRated,
+        averageDriverRating: driversRated
+          ? Math.round((driverRatingSum / driversRated) * 10) / 10
+          : null,
       },
       rides: {
         total: rides.length,
