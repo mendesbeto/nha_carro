@@ -27,9 +27,52 @@ describe('RidesService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    supabase = { getUserClient: jest.fn() };
+    supabase = { getUserClient: jest.fn(), getClient: jest.fn() };
     wallet = { completeRideSettlement: jest.fn() };
     service = new RidesService(supabase as never, wallet as never);
+  });
+
+  it('rejects admin ride history for non-admin users', async () => {
+    await expect(service.adminHistory(passenger)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(supabase.getClient).not.toHaveBeenCalled();
+  });
+
+  it('returns recent ride history to admins with passenger and driver details', async () => {
+    const query: any = {};
+    query.select = jest.fn(() => query);
+    query.order = jest.fn(() => query);
+    query.limit = jest.fn().mockResolvedValue({
+      data: [{
+        id: 'ride-1',
+        passageiro_id: 'passenger-1',
+        motorista_id: 'driver-1',
+        valor_total: 2500,
+        valor_comissao: 500,
+        forma_pagamento: 'DINHEIRO',
+        status: 'CONCLUIDA',
+        criado_em: '2026-11-09T00:45:50Z',
+        passageiro: { nome: 'Passageiro Teste', telefone: '000' },
+        motorista: { nome: 'Motorista Teste', telefone: '111' },
+      }],
+      error: null,
+    });
+    supabase.getClient.mockReturnValue({
+      from: jest.fn().mockReturnValue(query),
+    });
+    const admin = { sub: 'admin-1', email: 'a@example.com', role: 'admin' as const };
+
+    const result = await service.adminHistory(admin);
+
+    expect(supabase.getClient).toHaveBeenCalledTimes(1);
+    expect(query.order).toHaveBeenCalledWith('criado_em', { ascending: false });
+    expect(query.limit).toHaveBeenCalledWith(100);
+    expect(result.rides[0]).toMatchObject({
+      rideId: 'ride-1',
+      status: 'CONCLUIDA',
+      valor: 2500,
+      passageiro: { nome: 'Passageiro Teste' },
+      motorista: { nome: 'Motorista Teste' },
+    });
   });
 
   it('rejects available rides for passengers', async () => {
