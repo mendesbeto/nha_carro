@@ -87,6 +87,90 @@ describe('RidesService', () => {
     });
   });
 
+  it('paginates all ride records when the admin summary exceeds 1,000 rows', async () => {
+    const rideRows = Array.from({ length: 1001 }, (_, index) => ({
+      status: 'CONCLUIDA',
+      valor_total: 2500,
+      valor_comissao: 500,
+      criado_em: '2026-11-10T12:00:00.000Z',
+    }));
+    const requestedRanges: Array<[number, number]> = [];
+    const client: any = {
+      from: jest.fn((table: string) => {
+        const query: any = {};
+        query.select = jest.fn(() => query);
+        query.order = jest.fn(() => query);
+        query.eq = jest.fn(() => query);
+        query.range = jest.fn(async (from: number, to: number) => {
+          if (table === 'corridas') requestedRanges.push([from, to]);
+          const rows = table === 'corridas'
+            ? rideRows
+            : [];
+          return { data: rows.slice(from, to + 1), error: null };
+        });
+        return query;
+      }),
+    };
+    supabase.getClient.mockReturnValue(client);
+    const admin = { sub: 'admin-1', email: 'a@example.com', role: 'admin' as const };
+
+    const result = await service.adminSummary(admin);
+
+    expect(requestedRanges).toEqual([[0, 999], [1000, 1999]]);
+    expect(result.rides).toMatchObject({ total: 1001, completed: 1001 });
+    expect(result.weeklyActivity.find((day) => day.date === '2026-11-10')).toMatchObject({
+      total: 1001,
+      completed: 1001,
+      cancelled: 0,
+    });
+  });
+
+  it('builds exactly seven UTC activity days and excludes records outside the date window', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-11-12T10:30:00.000Z'));
+    try {
+      const rideRows = [
+        { status: 'CONCLUIDA', valor_total: 2500, valor_comissao: 500, criado_em: '2026-11-05T23:59:59.999Z' },
+        { status: 'CONCLUIDA', valor_total: 2500, valor_comissao: 500, criado_em: '2026-11-06T00:00:00.000Z' },
+        { status: 'CANCELADA', valor_total: 0, valor_comissao: 0, criado_em: '2026-11-12T23:59:59.999Z' },
+        { status: 'CONCLUIDA', valor_total: 2500, valor_comissao: 500, criado_em: '2026-11-13T00:00:00.000Z' },
+      ];
+      const client: any = {
+        from: jest.fn((table: string) => {
+          const query: any = {};
+          query.select = jest.fn(() => query);
+          query.order = jest.fn(() => query);
+          query.eq = jest.fn(() => query);
+          query.range = jest.fn(async (from: number, to: number) => ({
+            data: table === 'corridas' ? rideRows.slice(from, to + 1) : [],
+            error: null,
+          }));
+          return query;
+        }),
+      };
+      supabase.getClient.mockReturnValue(client);
+      const admin = { sub: 'admin-1', email: 'a@example.com', role: 'admin' as const };
+
+      const result = await service.adminSummary(admin);
+
+      expect(result.weeklyActivity).toHaveLength(7);
+      expect(result.weeklyActivity.map((day) => day.date)).toEqual([
+        '2026-11-06',
+        '2026-11-07',
+        '2026-11-08',
+        '2026-11-09',
+        '2026-11-10',
+        '2026-11-11',
+        '2026-11-12',
+      ]);
+      expect(result.weeklyActivity[0]).toMatchObject({ total: 1, completed: 1, cancelled: 0 });
+      expect(result.weeklyActivity[6]).toMatchObject({ total: 1, completed: 0, cancelled: 1 });
+      expect(result.weeklyActivity.reduce((sum, day) => sum + day.total, 0)).toBe(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('rejects admin ride history for non-admin users', async () => {
     await expect(service.adminHistory(passenger)).rejects.toBeInstanceOf(ForbiddenException);
     expect(supabase.getClient).not.toHaveBeenCalled();
