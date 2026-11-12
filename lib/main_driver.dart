@@ -42,6 +42,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   List<Map<String, dynamic>> _incomingRides = [];
   Map<String, dynamic>? _activeRide;
   bool _online = false;
+  bool _updatingAvailability = false;
   String _walletBalance = '—';
   String _commissionDebtTotal = '—';
   List<Map<String, dynamic>> _commissionDebts = [];
@@ -92,73 +93,99 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
   }
 
+  String _locationErrorMessage(Object error) {
+    final message = error.toString().replaceFirst('Exception: ', '').trim();
+    final normalized = message.toLowerCase();
+
+    if (normalized.contains('location services are disabled') ||
+        normalized.contains('location service is disabled') ||
+        normalized.contains('serviço de localização') ||
+        normalized.contains('servico de localizacao')) {
+      return 'A localização do dispositivo está desligada. Ative o GPS/localização e tente novamente.';
+    }
+    if (normalized.contains('permission') &&
+        (normalized.contains('denied') || normalized.contains('not granted'))) {
+      return 'O acesso à localização foi negado. Permita a localização nas definições do navegador/dispositivo.';
+    }
+    if (normalized.contains('permissão gps recusada') ||
+        normalized.contains('permissao gps recusada')) {
+      return 'O acesso à localização foi negado. Permita a localização nas definições do navegador/dispositivo.';
+    }
+    if (normalized.contains('timeout') || normalized.contains('timed out')) {
+      return 'Não foi possível obter a localização a tempo. Verifique o GPS e tente novamente.';
+    }
+    if (message.isEmpty) {
+      return 'Não foi possível obter a localização do motorista.';
+    }
+    return message;
+  }
+
+  Future<Position> _getDriverPosition({Duration? timeLimit}) async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw Exception('O serviço de localização do dispositivo está desativado.');
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      throw Exception('Permissão GPS recusada. Autorize a localização nas definições do navegador.');
+    }
+
+    return Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+      timeLimit: timeLimit,
+    );
+  }
+
   Future<void> _toggleOnline(bool value) async {
-    if (value) {
-      try {
-        final permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied ||
-            permission == LocationPermission.deniedForever) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Permita o acesso à localização para ficar online.'),
-            ),
-          );
-          return;
-        }
+    if (_updatingAvailability) return;
+    setState(() => _updatingAvailability = true);
 
-        final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
-
+    try {
+      if (value) {
+        final position = await _getDriverPosition();
         await _api.setDriverAvailability(
           online: true,
           latitude: position.latitude,
           longitude: position.longitude,
         );
-      } catch (error) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              error.toString().replaceFirst('Exception: ', ''),
-            ),
-          ),
-        );
-        return;
-      }
-    } else {
-      try {
+      } else {
         await _api.setDriverAvailability(online: false);
-      } catch (error) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              error.toString().replaceFirst('Exception: ', ''),
-            ),
-          ),
-        );
-        return;
       }
-    }
 
-    await _authService.saveDriverAvailability(value);
-    if (!mounted) return;
-    setState(() {
-      _online = value;
-      if (!value) _incomingRides = [];
-    });
-    if (value) {
-      await _loadAvailableRides();
-      _startRidesPolling();
-      _startLocationUpdates();
-    } else {
-      _stopRidesPolling();
-      if (_activeRide != null) {
+      await _authService.saveDriverAvailability(value);
+      if (!mounted) return;
+
+      setState(() {
+        _online = value;
+        if (!value) _incomingRides = [];
+      });
+
+      if (value) {
+        await _loadAvailableRides();
+        _startRidesPolling();
         _startLocationUpdates();
       } else {
-        _stopLocationUpdates();
+        _stopRidesPolling();
+        // Keep GPS updates during an active ride so the map marker remains current.
+        if (_activeRide != null) {
+          _startLocationUpdates();
+        } else {
+          _stopLocationUpdates();
+        }
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_locationErrorMessage(error))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _updatingAvailability = false);
       }
     }
   }
@@ -183,22 +210,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     if ((!_online && _activeRide == null) || _sendingLocation) return;
     _sendingLocation = true;
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        throw Exception('O serviço de localização do dispositivo está desativado.');
-      }
-
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        throw Exception('Permissão GPS recusada. Autorize a localização nas definições do navegador.');
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+      final position = await _getDriverPosition(
         timeLimit: const Duration(seconds: 8),
       );
       // Keep location updates running during an active ride even if the driver
@@ -639,7 +651,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   ),
                   Switch(
                     value: _online,
-                    onChanged: _toggleOnline,
+                    onChanged: _updatingAvailability ? null : _toggleOnline,
                   ),
                 ],
               ),
