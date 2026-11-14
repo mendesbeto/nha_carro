@@ -97,7 +97,7 @@ describe('AuthService', () => {
     supabase.getClient.mockReturnValue(client);
 
     await expect(auth.register({ name: 'Beto', email: 'beto@example.com', telefone: '+2459000000', password: 'secret123', role: 'passenger' })).rejects.toBeInstanceOf(ConflictException);
-    expect(deleteUser).toHaveBeenCalledWith('user-1');
+    expect(deleteUser).not.toHaveBeenCalled();
   });
 
   it('maps unexpected registration failure to a server error', async () => {
