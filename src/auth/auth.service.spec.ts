@@ -87,7 +87,7 @@ describe('AuthService', () => {
     expect(signOut).toHaveBeenCalledWith('access-token');
   });
 
-  it('cleans up the Auth user when profile creation fails', async () => {
+  it('does not delete an Auth identity when profile creation fails', async () => {
     const profile = makeChain({ data: null, error: { code: '23505', message: 'duplicate phone' } });
     const deleteUser = jest.fn().mockResolvedValue({ error: null });
     const client: any = {
