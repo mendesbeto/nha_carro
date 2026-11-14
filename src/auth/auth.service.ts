@@ -127,6 +127,9 @@ export class AuthService {
     });
 
     if (signedIn.error || !signedIn.data.user || !signedIn.data.session) {
+      if (signedIn.error?.message?.toLowerCase().includes('email not confirmed')) {
+        throw new UnauthorizedException('Confirme o seu e-mail antes de iniciar sessão.');
+      }
       throw new UnauthorizedException('Credenciais inválidas.');
     }
 
