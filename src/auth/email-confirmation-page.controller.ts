@@ -1,14 +1,17 @@
-import { Controller, Get, Header, InternalServerErrorException, Query } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { SupabaseService } from '../supabase/supabase.service';
 
 @Controller('confirm-email')
 export class EmailConfirmationPageController {
   constructor(private readonly supabase: SupabaseService) {}
 
-  @Get('verify')
+  @Post('verify')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Header('Cache-Control', 'no-store, max-age=0')
   @Header('Referrer-Policy', 'no-referrer')
-  async verify(@Query('token') token?: string): Promise<{ confirmed: boolean }> {
+  async verify(@Body('token') token?: string): Promise<{ confirmed: boolean }> {
     if (!token || token.length > 8192) return { confirmed: false };
     const { data, error } = await this.supabase.getClient().auth.getUser(token);
     if (error || !data.user?.email_confirmed_at) return { confirmed: false };
@@ -40,7 +43,7 @@ export class EmailConfirmationPageController {
     return;
   }
   try {
-    const response = await fetch('/confirm-email/verify?token=' + encodeURIComponent(token), {cache: 'no-store'});
+    const response = await fetch('/confirm-email/verify', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({token}), cache: 'no-store'});
     const result = await response.json();
     if (!response.ok || result.confirmed !== true) throw new Error('not-confirmed');
     title.textContent = 'E-mail confirmado!';
