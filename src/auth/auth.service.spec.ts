@@ -18,6 +18,7 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.EMAIL_CONFIRMATION_REDIRECT_URL = 'https://nha-carro.onrender.com/confirm-email';
     supabase = { getClient: jest.fn(), getAuthClient: jest.fn() };
     emailService = { sendSignupConfirmationEmail: jest.fn().mockResolvedValue(undefined) };
     auth = new AuthService(supabase as never, emailService as never);
@@ -52,6 +53,22 @@ describe('AuthService', () => {
     supabase.getAuthClient.mockReturnValue(client);
 
     await expect(auth.login({ email: 'beto@example.com', password: 'wrongpass' })).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('returns a clear message when the email has not been confirmed', async () => {
+    const client = {
+      auth: {
+        signInWithPassword: jest.fn().mockResolvedValue({
+          data: { user: null, session: null },
+          error: { message: 'Email not confirmed' },
+        }),
+      },
+    };
+    supabase.getAuthClient.mockReturnValue(client);
+
+    await expect(
+      auth.login({ email: 'beto@example.com', password: 'secret123' }),
+    ).rejects.toThrow('Confirme o seu e-mail antes de iniciar sessão.');
   });
 
   it('rejects a blocked account after authentication', async () => {
