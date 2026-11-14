@@ -308,26 +308,6 @@ class _RegistrationFormScreenState extends State<RegistrationFormScreen> {
         (route) => false,
       );
 
-      setState(() => _loading = false);
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.role == UserRole.passenger
-                ? 'Cadastro de passageiro realizado com sucesso!'
-                : 'Cadastro de motorista realizado com sucesso!',
-          ),
-        ),
-      );
-
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute<void>(
-          builder: (_) => widget.role == UserRole.passenger ? const HomePassengerScreen() : const DriverHomeScreen(),
-        ),
-        (route) => false,
-      );
     } catch (error) {
       if (!mounted) return;
       setState(() => _loading = false);
