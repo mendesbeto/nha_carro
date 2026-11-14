@@ -89,6 +89,8 @@ export class AuthService {
       .single();
 
     if (profile.error || !profile.data) {
+      // Do not delete the Auth identity here: generateLink may return an existing
+      // unconfirmed user. A failed profile insert must never remove that account.
       if (profile.error?.code === '23505') {
         throw new ConflictException('Este e-mail ou telefone já está registrado.');
       }
@@ -104,6 +106,8 @@ export class AuthService {
         generated.data.properties.action_link,
       );
     } catch (error) {
+      // Roll back only rows created by this attempt. Keep the Auth identity because
+      // its ownership cannot safely be inferred from generateLink's response.
       await client.from('veiculos_motoristas').delete().eq('motorista_id', authUser.id);
       await client.from('usuarios').delete().eq('id', authUser.id);
       throw error;
