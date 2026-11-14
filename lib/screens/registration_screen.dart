@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../main_driver.dart';
 import '../services/api_service.dart';
-import '../services/auth_service.dart';
 import 'home_passenger_screen.dart';
 import 'login_screen.dart';
 
@@ -233,7 +232,6 @@ class _RegistrationFormScreenState extends State<RegistrationFormScreen> {
   final _confirmPasswordController = TextEditingController();
   final _vehicleController = TextEditingController();
   final _plateController = TextEditingController();
-  final _auth = AuthService();
   bool _loading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -283,14 +281,31 @@ class _RegistrationFormScreenState extends State<RegistrationFormScreen> {
 
       if (!mounted) return;
 
-      await _auth.saveSession(
-        role: (response['role'] as String?) ?? widget.role.name,
-        name: (response['name'] as String?) ?? _nameController.text.trim(),
-        email: (response['email'] as String?) ?? _emailController.text.trim(),
-        accessToken: (response['access_token'] as String?) ?? '',
-        refreshToken: (response['refresh_token'] as String?) ?? '',
-        phone: _phoneController.text.trim(),
-        rememberMe: true,
+      setState(() => _loading = false);
+
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          icon: const Icon(Icons.mark_email_read_outlined, color: Color(0xFF0B8F62), size: 42),
+          title: const Text('Confirme o seu e-mail'),
+          content: Text(
+            'Enviámos um link de confirmação para ${response['email'] ?? _emailController.text.trim()}. Abra a sua caixa de correio e confirme o endereço. Depois, volte ao NhaCarro e inicie sessão.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Entendi'),
+            ),
+          ],
+        ),
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+        (route) => false,
       );
 
       setState(() => _loading = false);
