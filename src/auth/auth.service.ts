@@ -89,7 +89,6 @@ export class AuthService {
       .single();
 
     if (profile.error || !profile.data) {
-      await client.auth.admin.deleteUser(authUser.id);
       if (profile.error?.code === '23505') {
         throw new ConflictException('Este e-mail ou telefone já está registrado.');
       }
@@ -107,7 +106,6 @@ export class AuthService {
     } catch (error) {
       await client.from('veiculos_motoristas').delete().eq('motorista_id', authUser.id);
       await client.from('usuarios').delete().eq('id', authUser.id);
-      await client.auth.admin.deleteUser(authUser.id);
       throw error;
     }
 
