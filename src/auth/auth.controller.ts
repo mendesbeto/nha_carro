@@ -16,6 +16,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
+import { ResendSignupConfirmationDto } from './dto/resend-signup-confirmation.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Controller('api/auth')
@@ -29,6 +30,13 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
+  }
+
+  @Post('resend-confirmation')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  resendConfirmation(@Body() dto: ResendSignupConfirmationDto) {
+    return this.authService.resendSignupConfirmation(dto.email);
   }
 
   @Post('login')

@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
+import { EmailService } from './email.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto, RegistrationRole } from './dto/register.dto';
 
@@ -36,30 +37,69 @@ const DATABASE_TO_ROLE: Record<
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly emailService: EmailService,
+  ) {}
 
-  async register(dto: RegisterDto): Promise<AuthResponse> {
+  async register(dto: RegisterDto): Promise<{ message: string; email: string }> {
     const email = dto.email.trim().toLowerCase();
     const name = dto.name.trim();
-    const client = this.supabase.getClient();
-
-    const created = await client.auth.admin.createUser({
-      email,
-      password: dto.password,
-      email_confirm: true,
-      user_metadata: { full_name: name },
-    });
-
-    if (created.error || !created.data.user) {
-      if (created.error?.status === 422 || created.error?.code === 'email_exists') {
-        throw new ConflictException('Este e-mail já está registrado.');
-      }
+    const redirectTo = process.env.EMAIL_CONFIRMATION_REDIRECT_URL;
+    if (!redirectTo) {
       throw new InternalServerErrorException(
-        created.error?.message ?? 'Não foi possível criar a conta.',
+        'A confirmação de e-mail ainda não está configurada.',
       );
     }
 
-    const authUser = created.data.user;
+    const client = this.supabase.getClient();
+
+    // Fail closed if this email already has an Auth identity. generateLink is
+    // an admin operation and must not be used to attach a new app profile to an
+    // identity that may belong to someone else or to a previous partial signup.
+    const perPage = 1000;
+    for (let page = 1; ; page += 1) {
+      const listed = await client.auth.admin.listUsers({ page, perPage });
+      if (listed.error) {
+        throw new InternalServerErrorException(
+          'Não foi possível validar o endereço de e-mail para o registo.',
+        );
+      }
+      const existing = listed.data.users.some(
+        (user) => user.email?.trim().toLowerCase() === email,
+      );
+      if (existing) {
+        throw new ConflictException(
+          'Este e-mail já está associado a uma conta. Se ainda não confirmou o endereço, solicite o reenvio da confirmação.',
+        );
+      }
+      if (listed.data.users.length < perPage) break;
+    }
+
+    const generated = await client.auth.admin.generateLink({
+      type: 'signup',
+      email,
+      password: dto.password,
+      options: {
+        redirectTo,
+        data: { full_name: name },
+      },
+    });
+
+    if (generated.error || !generated.data.user || !generated.data.properties?.action_link) {
+      if (
+        generated.error?.status === 422 ||
+        generated.error?.code === 'email_exists' ||
+        generated.error?.message?.toLowerCase().includes('already registered')
+      ) {
+        throw new ConflictException('Este e-mail já está registrado. Se ainda não confirmou o endereço, solicite o reenvio da confirmação.');
+      }
+      throw new InternalServerErrorException(
+        generated.error?.message ?? 'Não foi possível preparar a confirmação da conta.',
+      );
+    }
+
+    const authUser = generated.data.user;
     const profile = await client
       .from('usuarios')
       .insert({
@@ -72,7 +112,8 @@ export class AuthService {
       .single();
 
     if (profile.error || !profile.data) {
-      await client.auth.admin.deleteUser(authUser.id);
+      // Do not delete the Auth identity here: generateLink may return an existing
+      // unconfirmed user. A failed profile insert must never remove that account.
       if (profile.error?.code === '23505') {
         throw new ConflictException('Este e-mail ou telefone já está registrado.');
       }
@@ -84,25 +125,53 @@ export class AuthService {
     try {
       await this.saveVehicleIfProvided(client, dto, authUser.id);
     } catch (error) {
+      // Roll back only the profile/vehicle rows created in this attempt.
+      await client.from('veiculos_motoristas').delete().eq('motorista_id', authUser.id);
       await client.from('usuarios').delete().eq('id', authUser.id);
-      await client.auth.admin.deleteUser(authUser.id);
       throw error;
     }
 
-    const signedIn = await this.supabase
-      .getAuthClient()
-      .auth.signInWithPassword({ email, password: dto.password });
-
-    if (signedIn.error || !signedIn.data.session) {
-      await client.from('usuarios').delete().eq('id', authUser.id);
-      await client.auth.admin.deleteUser(authUser.id);
+    // Keep the profile if email delivery fails. This allows the user to request
+    // another confirmation without creating a second profile or Auth identity.
+    try {
+      await this.emailService.sendSignupConfirmationEmail(
+        email,
+        generated.data.properties.action_link,
+      );
+    } catch {
       throw new InternalServerErrorException(
-        signedIn.error?.message ??
-          'Não foi possível iniciar a sessão após criar a conta.',
+        'A conta foi criada, mas não conseguimos enviar o e-mail. Use a opção de reenviar confirmação.',
       );
     }
 
-    return this.toAuthResponse(profile.data, email, signedIn.data.session);
+    return {
+      message: 'Conta criada. Verifique o seu e-mail e confirme o endereço antes de iniciar sessão.',
+      email,
+    };
+  }
+
+  async resendSignupConfirmation(emailInput: string): Promise<{ message: string }> {
+    const email = emailInput.trim().toLowerCase();
+    const redirectTo = process.env.EMAIL_CONFIRMATION_REDIRECT_URL;
+    const genericMessage =
+      'Se existir uma conta pendente para esse endereço, enviaremos instruções de confirmação.';
+
+    if (!redirectTo) return { message: genericMessage };
+
+    try {
+      // Supabase Auth's resend endpoint sends through the project's configured
+      // Auth SMTP provider. Configure that provider (e.g. Resend SMTP) before
+      // relying on this recovery path in production.
+      await this.supabase.getAuthClient().auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: redirectTo },
+      });
+    } catch {
+      // Do not disclose account existence or provider errors to callers.
+    }
+
+    return { message: genericMessage };
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {
@@ -115,6 +184,9 @@ export class AuthService {
     });
 
     if (signedIn.error || !signedIn.data.user || !signedIn.data.session) {
+      if (signedIn.error?.message?.toLowerCase().includes('email not confirmed')) {
+        throw new UnauthorizedException('Confirme o seu e-mail antes de iniciar sessão.');
+      }
       throw new UnauthorizedException('Credenciais inválidas.');
     }
 

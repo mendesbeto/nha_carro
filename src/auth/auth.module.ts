@@ -6,10 +6,11 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { PasswordResetService } from './password-reset.service';
 import { EmailService } from './email.service';
 import { PasswordResetPageController } from './password-reset-page.controller';
+import { EmailConfirmationPageController } from './email-confirmation-page.controller';
 
 @Module({
   imports: [ConfigModule],
-  controllers: [AuthController, PasswordResetPageController],
+  controllers: [AuthController, PasswordResetPageController, EmailConfirmationPageController],
   providers: [AuthService, JwtAuthGuard, PasswordResetService, EmailService],
   exports: [AuthService, JwtAuthGuard],
 })
