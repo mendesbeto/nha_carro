@@ -29,7 +29,7 @@ describe('AuthService', () => {
     const profile = makeChain({ data: { id: 'user-1', nome: 'Beto', telefone: '+2459000000', tipo_perfil: 'PASSAGEIRO' }, error: null });
     const adminClient: any = {
       auth: {
-        admin: { generateLink: jest.fn().mockResolvedValue({ data: { user: { id: 'user-1' }, properties: { action_link: 'https://example.test/confirm' } }, error: null }), deleteUser: jest.fn() },
+        admin: { listUsers: jest.fn().mockResolvedValue({ data: { users: [] }, error: null }), generateLink: jest.fn().mockResolvedValue({ data: { user: { id: 'user-1' }, properties: { action_link: 'https://example.test/confirm' } }, error: null }), deleteUser: jest.fn() },
       },
       from: jest.fn(() => profile),
     };
@@ -42,8 +42,33 @@ describe('AuthService', () => {
     expect(supabase.getAuthClient).not.toHaveBeenCalled();
   });
 
+  it('does not attach an app profile to an existing Auth identity', async () => {
+    const generateLink = jest.fn();
+    const client = {
+      auth: {
+        admin: {
+          listUsers: jest.fn().mockResolvedValue({
+            data: { users: [{ id: 'existing-user', email: 'beto@example.com' }] },
+            error: null,
+          }),
+          generateLink,
+        },
+      },
+    };
+    supabase.getClient.mockReturnValue(client);
+
+    await expect(auth.register({
+      name: 'Beto',
+      email: 'beto@example.com',
+      telefone: '+2459000000',
+      password: 'secret123',
+      role: 'passenger',
+    })).rejects.toBeInstanceOf(ConflictException);
+    expect(generateLink).not.toHaveBeenCalled();
+  });
+
   it('rejects registration when the email already exists', async () => {
-    const client = { auth: { admin: { generateLink: jest.fn().mockResolvedValue({ data: { user: null }, error: { status: 422, message: 'User already registered' } }) } } };
+    const client = { auth: { admin: { listUsers: jest.fn().mockResolvedValue({ data: { users: [] }, error: null }), generateLink: jest.fn().mockResolvedValue({ data: { user: null }, error: { status: 422, message: 'User already registered' } }) } } };
     supabase.getClient.mockReturnValue(client);
 
     await expect(auth.register({ name: 'Beto', email: 'beto@example.com', telefone: '+2459000000', password: 'secret123', role: 'passenger' })).rejects.toBeInstanceOf(ConflictException);
@@ -53,7 +78,7 @@ describe('AuthService', () => {
     const profile = makeChain({ data: { id: 'user-1', nome: 'Beto', telefone: '+2459000000', tipo_perfil: 'PASSAGEIRO' }, error: null });
     const client: any = {
       auth: {
-        admin: { generateLink: jest.fn().mockResolvedValue({ data: { user: { id: 'user-1' }, properties: { action_link: 'https://example.test/confirm' } }, error: null }) },
+        admin: { listUsers: jest.fn().mockResolvedValue({ data: { users: [] }, error: null }), generateLink: jest.fn().mockResolvedValue({ data: { user: { id: 'user-1' }, properties: { action_link: 'https://example.test/confirm' } }, error: null }) },
       },
       from: jest.fn(() => profile),
     };
@@ -122,7 +147,7 @@ describe('AuthService', () => {
     const profile = makeChain({ data: null, error: { code: '23505', message: 'duplicate phone' } });
     const deleteUser = jest.fn().mockResolvedValue({ error: null });
     const client: any = {
-      auth: { admin: { generateLink: jest.fn().mockResolvedValue({ data: { user: { id: 'user-1' }, properties: { action_link: 'https://example.test/confirm' } }, error: null }), deleteUser } },
+      auth: { admin: { listUsers: jest.fn().mockResolvedValue({ data: { users: [] }, error: null }), generateLink: jest.fn().mockResolvedValue({ data: { user: { id: 'user-1' }, properties: { action_link: 'https://example.test/confirm' } }, error: null }), deleteUser } },
       from: jest.fn(() => profile),
     };
     supabase.getClient.mockReturnValue(client);
@@ -132,7 +157,7 @@ describe('AuthService', () => {
   });
 
   it('maps unexpected registration failure to a server error', async () => {
-    const client = { auth: { admin: { generateLink: jest.fn().mockResolvedValue({ data: { user: null }, error: { status: 500, message: 'Auth unavailable' } }) } } };
+    const client = { auth: { admin: { listUsers: jest.fn().mockResolvedValue({ data: { users: [] }, error: null }), generateLink: jest.fn().mockResolvedValue({ data: { user: null }, error: { status: 500, message: 'Auth unavailable' } }) } } };
     supabase.getClient.mockReturnValue(client);
 
     await expect(auth.register({ name: 'Beto', email: 'beto@example.com', telefone: '+2459000000', password: 'secret123', role: 'passenger' })).rejects.toBeInstanceOf(InternalServerErrorException);
