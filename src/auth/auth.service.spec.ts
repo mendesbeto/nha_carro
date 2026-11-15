@@ -7,6 +7,7 @@ function makeChain(result: unknown) {
   c.eq = jest.fn(() => c);
   c.maybeSingle = jest.fn().mockResolvedValue(result);
   c.insert = jest.fn(() => c);
+  c.delete = jest.fn(() => c);
   c.single = jest.fn().mockResolvedValue(result);
   return c;
 }
@@ -46,6 +47,36 @@ describe('AuthService', () => {
     supabase.getClient.mockReturnValue(client);
 
     await expect(auth.register({ name: 'Beto', email: 'beto@example.com', telefone: '+2459000000', password: 'secret123', role: 'passenger' })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('keeps the profile when the confirmation email delivery fails', async () => {
+    const profile = makeChain({ data: { id: 'user-1', nome: 'Beto', telefone: '+2459000000', tipo_perfil: 'PASSAGEIRO' }, error: null });
+    const client: any = {
+      auth: {
+        admin: { generateLink: jest.fn().mockResolvedValue({ data: { user: { id: 'user-1' }, properties: { action_link: 'https://example.test/confirm' } }, error: null }) },
+      },
+      from: jest.fn(() => profile),
+    };
+    supabase.getClient.mockReturnValue(client);
+    emailService.sendSignupConfirmationEmail.mockRejectedValue(new Error('Resend unavailable'));
+
+    await expect(auth.register({ name: 'Beto', email: 'beto@example.com', telefone: '+2459000000', password: 'secret123', role: 'passenger' }))
+      .rejects.toBeInstanceOf(InternalServerErrorException);
+    expect(profile.delete).not.toHaveBeenCalled();
+  });
+
+  it('resends confirmation through Supabase Auth without revealing account existence', async () => {
+    const resend = jest.fn().mockResolvedValue({ error: null });
+    supabase.getAuthClient.mockReturnValue({ auth: { resend } });
+
+    const result = await auth.resendSignupConfirmation(' Beto@Example.COM ');
+
+    expect(resend).toHaveBeenCalledWith({
+      type: 'signup',
+      email: 'beto@example.com',
+      options: { emailRedirectTo: 'https://nha-carro.onrender.com/confirm-email' },
+    });
+    expect(result.message).toContain('Se existir uma conta pendente');
   });
 
   it('rejects invalid login credentials', async () => {
