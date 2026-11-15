@@ -87,6 +87,74 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _resendConfirmation() async {
+    final controller = TextEditingController(text: _emailController.text.trim());
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Reenviar confirmação'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.emailAddress,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'E-mail',
+              hintText: 'nome@exemplo.com',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final email = controller.text.trim();
+                if (!email.contains('@')) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Informe um e-mail válido.')),
+                  );
+                  return;
+                }
+                Navigator.of(dialogContext).pop();
+                try {
+                  await ApiService().resendSignupConfirmation(email: email);
+                  if (!mounted) return;
+                  await showDialog<void>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text('Pedido recebido'),
+                      content: const Text(
+                        'Se existir uma conta pendente para esse endereço, enviaremos instruções de confirmação. Verifique também a pasta de spam.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Fechar'),
+                        ),
+                      ],
+                    ),
+                  );
+                } catch (error) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(error.toString().replaceFirst('Exception: ', '')),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Reenviar'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+
   Future<void> _resetPassword() async {
     final controller = TextEditingController(text: _emailController.text.trim());
 
@@ -261,6 +329,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               TextButton(
                                 onPressed: _resetPassword,
                                 child: const Text('Esqueci-me da senha'),
+                              ),
+                              TextButton(
+                                onPressed: _loading ? null : _resendConfirmation,
+                                child: const Text('Reenviar confirmação'),
                               ),
                             ],
                           ),
