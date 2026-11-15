@@ -53,6 +53,29 @@ export class AuthService {
     }
 
     const client = this.supabase.getClient();
+
+    // Fail closed if this email already has an Auth identity. generateLink is
+    // an admin operation and must not be used to attach a new app profile to an
+    // identity that may belong to someone else or to a previous partial signup.
+    const perPage = 1000;
+    for (let page = 1; ; page += 1) {
+      const listed = await client.auth.admin.listUsers({ page, perPage });
+      if (listed.error) {
+        throw new InternalServerErrorException(
+          'Não foi possível validar o endereço de e-mail para o registo.',
+        );
+      }
+      const existing = listed.data.users.some(
+        (user) => user.email?.trim().toLowerCase() === email,
+      );
+      if (existing) {
+        throw new ConflictException(
+          'Este e-mail já está associado a uma conta. Se ainda não confirmou o endereço, solicite o reenvio da confirmação.',
+        );
+      }
+      if (listed.data.users.length < perPage) break;
+    }
+
     const generated = await client.auth.admin.generateLink({
       type: 'signup',
       email,
