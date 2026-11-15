@@ -142,6 +142,20 @@ class ApiService {
     return data;
   }
 
+  Future<void> resendSignupConfirmation({required String email}) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/auth/resend-confirmation'),
+      headers: await _headers(),
+      body: jsonEncode({'email': email}),
+    );
+    final data = _decodeBody(response);
+    if (response.statusCode >= 400) {
+      throw Exception(
+        data['message'] ?? data['error'] ?? 'Não foi possível solicitar o reenvio.',
+      );
+    }
+  }
+
   Future<void> requestPasswordReset({required String email}) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/auth/request-password-reset'),
