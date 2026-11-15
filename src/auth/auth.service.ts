@@ -69,7 +69,7 @@ export class AuthService {
         generated.error?.code === 'email_exists' ||
         generated.error?.message?.toLowerCase().includes('already registered')
       ) {
-        throw new ConflictException('Este e-mail já está registrado.');
+        throw new ConflictException('Este e-mail já está registrado. Se ainda não confirmou o endereço, solicite o reenvio da confirmação.');
       }
       throw new InternalServerErrorException(
         generated.error?.message ?? 'Não foi possível preparar a confirmação da conta.',
@@ -101,22 +101,54 @@ export class AuthService {
 
     try {
       await this.saveVehicleIfProvided(client, dto, authUser.id);
+    } catch (error) {
+      // Roll back only the profile/vehicle rows created in this attempt.
+      await client.from('veiculos_motoristas').delete().eq('motorista_id', authUser.id);
+      await client.from('usuarios').delete().eq('id', authUser.id);
+      throw error;
+    }
+
+    // Keep the profile if email delivery fails. This allows the user to request
+    // another confirmation without creating a second profile or Auth identity.
+    try {
       await this.emailService.sendSignupConfirmationEmail(
         email,
         generated.data.properties.action_link,
       );
-    } catch (error) {
-      // Roll back only rows created by this attempt. Keep the Auth identity because
-      // its ownership cannot safely be inferred from generateLink's response.
-      await client.from('veiculos_motoristas').delete().eq('motorista_id', authUser.id);
-      await client.from('usuarios').delete().eq('id', authUser.id);
-      throw error;
+    } catch {
+      throw new InternalServerErrorException(
+        'A conta foi criada, mas não conseguimos enviar o e-mail. Use a opção de reenviar confirmação.',
+      );
     }
 
     return {
       message: 'Conta criada. Verifique o seu e-mail e confirme o endereço antes de iniciar sessão.',
       email,
     };
+  }
+
+  async resendSignupConfirmation(emailInput: string): Promise<{ message: string }> {
+    const email = emailInput.trim().toLowerCase();
+    const redirectTo = process.env.EMAIL_CONFIRMATION_REDIRECT_URL;
+    const genericMessage =
+      'Se existir uma conta pendente para esse endereço, enviaremos instruções de confirmação.';
+
+    if (!redirectTo) return { message: genericMessage };
+
+    try {
+      // Supabase Auth's resend endpoint sends through the project's configured
+      // Auth SMTP provider. Configure that provider (e.g. Resend SMTP) before
+      // relying on this recovery path in production.
+      await this.supabase.getAuthClient().auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: redirectTo },
+      });
+    } catch {
+      // Do not disclose account existence or provider errors to callers.
+    }
+
+    return { message: genericMessage };
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {
