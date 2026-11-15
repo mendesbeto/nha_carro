@@ -330,11 +330,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                 onPressed: _resetPassword,
                                 child: const Text('Esqueci-me da senha'),
                               ),
-                              TextButton(
-                                onPressed: _loading ? null : _resendConfirmation,
-                                child: const Text('Reenviar confirmação'),
-                              ),
                             ],
+                          ),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _loading ? null : _resendConfirmation,
+                              child: const Text('Reenviar confirmação'),
+                            ),
                           ),
                           const SizedBox(height: 12),
                           SizedBox(
